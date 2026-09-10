@@ -80,6 +80,16 @@ function require_login(): string {
     return $_SESSION['username'];
 }
 
+// Every endpoint that reads/writes employees, companies, users, or logs
+// should scope its query by this. Falls back to STELLA only as a safety
+// net for old sessions created before branches existed.
+function current_branch(): string {
+    if (!isset($_SESSION['branch'])) {
+        json_error('Not logged in', 401);
+    }
+    return $_SESSION['branch'];
+}
+
 function require_role(mysqli $conn, string $username, array $roles): string {
     $stmt = $conn->prepare("SELECT role FROM users WHERE LOWER(username) = LOWER(?)");
     $stmt->bind_param('s', $username);
@@ -93,10 +103,11 @@ function require_role(mysqli $conn, string $username, array $roles): string {
     return $role;
 }
 
-function log_action(mysqli $conn, string $username, string $action, string $details) {
-    $stmt = $conn->prepare("INSERT INTO logs (action, username, details) VALUES (?, ?, ?)");
+function log_action(mysqli $conn, string $username, string $action, string $details, string $branch = null) {
+    $branch = $branch ?? ($_SESSION['branch'] ?? 'STELLA');
+    $stmt = $conn->prepare("INSERT INTO logs (action, username, details, branch) VALUES (?, ?, ?, ?)");
     if ($stmt) {
-        $stmt->bind_param('sss', $action, $username, $details);
+        $stmt->bind_param('ssss', $action, $username, $details, $branch);
         $stmt->execute();
         $stmt->close();
     }
@@ -107,7 +118,7 @@ function log_action(mysqli $conn, string $username, string $action, string $deta
 // dinein/takeout/giftcard/cashout/interest rows are excluded from the
 // "payable"/"cashout" side (they're settled outside the ledger), while
 // deposits, transfers and sends always count.
-function compute_balance(mysqli $conn, string $name): array {
+function compute_balance(mysqli $conn, string $name, string $branch): array {
     $sql = "SELECT
                 COALESCE(SUM(deposit),0) + COALESCE(SUM(receiver_amount),0) AS total_deposit,
                 COALESCE(SUM(CASE WHEN TRIM(LOWER(REPLACE(REPLACE(COALESCE(payment_method,''), '\\r', ''), '\\n', ''))) <> 'card'
@@ -117,15 +128,15 @@ function compute_balance(mysqli $conn, string $name): array {
                 COALESCE(SUM(receiver_amount),0) AS received,
                 COALESCE(SUM(sender_amount),0) AS sent,
                 COALESCE(SUM(giftcard),0) AS total_giftcard
-            FROM employees WHERE UPPER(name) = UPPER(?)";
+            FROM employees WHERE UPPER(name) = UPPER(?) AND branch = ?";
     $stmt = $conn->prepare($sql);
-    $stmt->bind_param('s', $name);
+    $stmt->bind_param('ss', $name, $branch);
     $stmt->execute();
     $row = $stmt->get_result()->fetch_assoc();
     $stmt->close();
 
-    $used_stmt = $conn->prepare("SELECT COALESCE(SUM(dinein + takeout),0) AS used FROM employees WHERE payment_method = 'giftcard' AND UPPER(name) = UPPER(?)");
-    $used_stmt->bind_param('s', $name);
+    $used_stmt = $conn->prepare("SELECT COALESCE(SUM(dinein + takeout),0) AS used FROM employees WHERE payment_method = 'giftcard' AND UPPER(name) = UPPER(?) AND branch = ?");
+    $used_stmt->bind_param('ss', $name, $branch);
     $used_stmt->execute();
     $used = $used_stmt->get_result()->fetch_assoc()['used'] ?? 0;
     $used_stmt->close();
@@ -150,22 +161,27 @@ function compute_balance(mysqli $conn, string $name): array {
     ];
 }
 
-function is_blocked(mysqli $conn, string $name): bool {
-    $stmt = $conn->prepare("SELECT block FROM employees WHERE UPPER(name) = UPPER(?) ORDER BY id DESC LIMIT 1");
-    $stmt->bind_param('s', $name);
+function is_blocked(mysqli $conn, string $name, string $branch): bool {
+    $stmt = $conn->prepare("SELECT block FROM employees WHERE UPPER(name) = UPPER(?) AND branch = ? ORDER BY id DESC LIMIT 1");
+    $stmt->bind_param('ss', $name, $branch);
     $stmt->execute();
     $row = $stmt->get_result()->fetch_assoc();
     $stmt->close();
     return $row && strtolower($row['block'] ?? '') === 'block';
 }
 
-function ensure_companies_table(mysqli $conn) {
+function ensure_companies_table(mysqli $conn, string $branch) {
     $conn->query("CREATE TABLE IF NOT EXISTS companies (
         id INT AUTO_INCREMENT PRIMARY KEY,
-        name VARCHAR(255) NOT NULL UNIQUE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        name VARCHAR(255) NOT NULL,
+        branch VARCHAR(100) NOT NULL DEFAULT 'STELLA',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY branch_name (branch, name)
     )");
-    $conn->query("INSERT IGNORE INTO companies (name)
-        SELECT DISTINCT TRIM(company) FROM employees
-        WHERE company IS NOT NULL AND TRIM(company) <> ''");
+    $stmt = $conn->prepare("INSERT IGNORE INTO companies (name, branch)
+        SELECT DISTINCT TRIM(company), branch FROM employees
+        WHERE company IS NOT NULL AND TRIM(company) <> '' AND branch = ?");
+    $stmt->bind_param('s', $branch);
+    $stmt->execute();
+    $stmt->close();
 }

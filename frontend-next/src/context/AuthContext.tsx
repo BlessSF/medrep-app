@@ -8,8 +8,9 @@ type Role = 'admin' | 'cashier' | '';
 interface AuthState {
   username: string | null;
   role: Role;
+  branch: string | null;
   loading: boolean;
-  login: (username: string, password: string) => Promise<void>;
+  login: (branch: string, username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -18,6 +19,7 @@ const AuthContext = createContext<AuthState | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [username, setUsername] = useState<string | null>(null);
   const [role, setRole] = useState<Role>('');
+  const [branch, setBranch] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -26,6 +28,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .then((r) => {
         setUsername(r.username);
         setRole(r.role);
+        setBranch(r.branch || null);
       })
       .catch(() => {
         setUsername(null);
@@ -33,10 +36,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .finally(() => setLoading(false));
   }, []);
 
-  const login = useCallback(async (u: string, p: string) => {
-    const r = await api.post('/auth/login.php', { username: u, password: p });
+  const login = useCallback(async (branchName: string, u: string, p: string) => {
+    const r = await api.post('/auth/login.php', { branch: branchName, username: u, password: p });
     setUsername(r.username);
     setRole(r.role);
+    setBranch(r.branch || branchName);
   }, []);
 
   const logout = useCallback(async () => {
@@ -47,10 +51,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     setUsername(null);
     setRole('');
+    setBranch(null);
   }, []);
 
   return (
-    <AuthContext.Provider value={{ username, role, loading, login, logout }}>
+    <AuthContext.Provider value={{ username, role, branch, loading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

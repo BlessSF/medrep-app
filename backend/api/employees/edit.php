@@ -2,6 +2,7 @@
 // POST /api/employees/edit.php { original_name, edit_name, edit_company }
 require_once __DIR__ . '/../../includes/api_helpers.php';
 $admin_username = require_login();
+$branch = current_branch();
 
 $data = json_input();
 $original_name = trim($data['original_name'] ?? '');
@@ -12,15 +13,15 @@ if ($original_name === '' || $edit_name === '' || $edit_company === '') {
     json_error('Please fill in all required fields.');
 }
 
-$result = $conn->prepare('SELECT name, company FROM employees WHERE name = ?');
-$result->bind_param('s', $original_name);
+$result = $conn->prepare('SELECT name, company FROM employees WHERE name = ? AND branch = ?');
+$result->bind_param('ss', $original_name, $branch);
 $result->execute();
 $result->bind_result($orig_name_db, $orig_company_db);
 $result->fetch();
 $result->close();
 
-$stmt = $conn->prepare('UPDATE employees SET name = ?, company = ? WHERE name = ?');
-$stmt->bind_param('sss', $edit_name, $edit_company, $original_name);
+$stmt = $conn->prepare('UPDATE employees SET name = ?, company = ? WHERE name = ? AND branch = ?');
+$stmt->bind_param('ssss', $edit_name, $edit_company, $original_name, $branch);
 
 if (!$stmt->execute()) {
     json_error('Error updating record: ' . $stmt->error, 500);

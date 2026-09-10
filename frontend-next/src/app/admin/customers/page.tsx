@@ -35,11 +35,14 @@ function CustomersPage() {
   }
 
   async function loadCompanies() {
+    console.log("FETCHING");
     const r = await api.get('/companies/index.php');
+    console.log("DATA DATA : ", r);
     setCompanies(r.companies.map((c: any) => c.name).sort());
   }
 
   useEffect(() => { load(); loadCompanies(); }, []);
+
 
   async function addMedrep(e: FormEvent) {
     e.preventDefault();

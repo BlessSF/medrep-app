@@ -4,6 +4,7 @@
 // type: deposit | dinein | takeout | giftcard | cashout | interest | transfer
 require_once __DIR__ . '/../../../includes/api_helpers.php';
 $cashier_name = require_login();
+$branch = current_branch();
 
 $data = json_input();
 $name = trim($data['name'] ?? '');
@@ -18,7 +19,7 @@ if ($name === '' || $amount <= 0) {
     json_error('Invalid transaction amount or missing medrep name.');
 }
 
-if (is_blocked($conn, $name)) {
+if (is_blocked($conn, $name, $branch)) {
     json_error("🚫 Transaction denied! {$name} is currently blocked.");
 }
 
@@ -32,11 +33,11 @@ if ($type === 'transfer') {
 
     $transfer_remarks = $remarks !== '' ? $remarks : 'Transfer';
 
-    $insertSender = $conn->prepare("INSERT INTO employees (name, company, sender_amount, receiver_name, remarks, cashier, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())");
-    $insertSender->bind_param('ssdsss', $name, $company, $amount, $transfer_name, $transfer_remarks, $cashier_name);
+    $insertSender = $conn->prepare("INSERT INTO employees (name, company, sender_amount, receiver_name, remarks, cashier, branch, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())");
+    $insertSender->bind_param('ssdssss', $name, $company, $amount, $transfer_name, $transfer_remarks, $cashier_name, $branch);
 
-    $insertReceiver = $conn->prepare("INSERT INTO employees (name, company, receiver_amount, sender_name, remarks, cashier, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())");
-    $insertReceiver->bind_param('ssdsss', $transfer_name, $transfer_company, $amount, $name, $transfer_remarks, $cashier_name);
+    $insertReceiver = $conn->prepare("INSERT INTO employees (name, company, receiver_amount, sender_name, remarks, cashier, branch, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())");
+    $insertReceiver->bind_param('ssdssss', $transfer_name, $transfer_company, $amount, $name, $transfer_remarks, $cashier_name, $branch);
 
     if ($insertSender->execute() && $insertReceiver->execute()) {
         json_success(['message' => '✅ Transfer successful!']);
@@ -59,7 +60,7 @@ switch ($type) {
 
 // $5000 balance cap check (only applies to dinein/takeout/giftcard paid 'na', mirroring submit.php)
 if ($type !== 'deposit' && $payment_method === 'na') {
-    $bal = compute_balance($conn, $name);
+    $bal = compute_balance($conn, $name, $branch);
     $new_total_payable = $bal['total_payable'] + $dinein + $takeout + $giftcard;
     $new_balance = $bal['total_deposit'] - ($new_total_payable + $bal['total_cashout']) + $bal['received'] - $bal['sent'];
     if ($new_balance > 5000) {
@@ -69,16 +70,16 @@ if ($type !== 'deposit' && $payment_method === 'na') {
 
 // Gift card balance check
 if (in_array($type, ['dinein', 'takeout'], true) && $payment_method === 'giftcard') {
-    $bal = compute_balance($conn, $name);
+    $bal = compute_balance($conn, $name, $branch);
     if (($dinein + $takeout) > $bal['giftcard_balance']) {
         json_error('❌ Insufficient gift card balance for ' . $name . '. Available: ' . number_format($bal['giftcard_balance'], 2));
     }
 }
 
 $stmt = $conn->prepare("INSERT INTO employees
-    (name, company, dinein, takeout, deposit, cashout, interest, giftcard, remarks, payment_method, card, cashier, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
-$stmt->bind_param('ssddddddssss', $name, $company, $dinein, $takeout, $deposit, $cashout, $interest, $giftcard, $remarks, $payment_method, $card, $cashier_name);
+    (name, company, dinein, takeout, deposit, cashout, interest, giftcard, remarks, payment_method, card, cashier, branch, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
+$stmt->bind_param('ssddddddsssss', $name, $company, $dinein, $takeout, $deposit, $cashout, $interest, $giftcard, $remarks, $payment_method, $card, $cashier_name, $branch);
 
 if (!$stmt->execute()) {
     json_error('Error inserting record: ' . $stmt->error, 500);

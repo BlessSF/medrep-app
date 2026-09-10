@@ -1,38 +1,21 @@
 <?php
-// Ported from export_transactions.php. Downloads still work exactly the
-// same (CSV or ?format=xlsx), just gated by the shared API session/CORS
-// bootstrap instead of a redirect-to-login-page.
+
 require_once __DIR__ . '/../includes/api_helpers.php';
 require_login();
-// This endpoint streams a file, not JSON — undo the JSON content-type
-// api_helpers.php set by default.
+$branch = current_branch();
+
 header_remove('Content-Type');
 
-// ------------------------------------------------------------
-// Downloads the raw transaction rows from the employees table.
-//   export_transactions.php                    -> every company, one CSV, all rows
-//   export_transactions.php?company=Acme        -> just that company's rows, CSV
-//   export_transactions.php?format=xlsx         -> every company, ONE Excel file
-//                                                  with a separate worksheet (tab)
-//                                                  per company
-// Used by the "Download All Transactions" / "Download All (By Company)" buttons
-// and each company's "Download" button on companies.php.
-// ------------------------------------------------------------
+
+
 $company = isset($_GET['company']) ? trim($_GET['company']) : '';
 $format  = isset($_GET['format']) ? strtolower(trim($_GET['format'])) : 'csv';
 
-// ------------------------------------------------------------
-// XLSX mode: one workbook, one worksheet per company, each sheet
-// holding only that company's transactions.
-// ------------------------------------------------------------
+
 if ($format === 'xlsx') {
     require_once __DIR__ . '/../includes/simple_xlsx_writer.php';
 
-    // A blank 500 with no message almost always means either PHP's error
-    // display is off (APP_DEBUG=false in db_config.php) or the ZipArchive
-    // class isn't available. Surface a real, readable reason for THIS
-    // endpoint specifically, no matter what APP_DEBUG is set to, so it's
-    // obvious what to fix instead of a dead "page isn't working" screen.
+    
     ini_set('display_errors', '1');
     error_reporting(E_ALL);
 
@@ -65,25 +48,26 @@ if ($format === 'xlsx') {
                     sender_name, receiver_name, payment_method, card,
                     remarks, cashier, block, created_at
              FROM employees
-             WHERE company = ?
+             WHERE company = ? AND branch = ?
              ORDER BY created_at ASC"
         );
         if (!$rowStmt) {
             throw new RuntimeException("Query prepare failed: " . $conn->error);
         }
 
-        // Which companies get a sheet? Either just the one requested via
-        // ?company=, or every distinct company on file (including a bucket
-        // for rows with no company set).
+       
         $companyNames = [];
         if ($company !== '') {
             $companyNames[] = $company;
         } else {
-            $listResult = $conn->query(
+            $listResult = $conn->prepare(
                 "SELECT DISTINCT company FROM employees
-                 WHERE company IS NOT NULL AND company <> ''
+                 WHERE company IS NOT NULL AND company <> '' AND branch = ?
                  ORDER BY company ASC"
             );
+            $listResult->bind_param('s', $branch);
+            $listResult->execute();
+            $listResult = $listResult->get_result();
             if (!$listResult) {
                 throw new RuntimeException("Company list query failed: " . $conn->error);
             }
@@ -92,16 +76,19 @@ if ($format === 'xlsx') {
             }
 
             // Rows with a blank/NULL company still need to end up somewhere.
-            $unassignedCheck = $conn->query(
-                "SELECT COUNT(*) AS n FROM employees WHERE company IS NULL OR company = ''"
+            $unassignedCheck = $conn->prepare(
+                "SELECT COUNT(*) AS n FROM employees WHERE (company IS NULL OR company = '') AND branch = ?"
             );
+            $unassignedCheck->bind_param('s', $branch);
+            $unassignedCheck->execute();
+            $unassignedCheck = $unassignedCheck->get_result();
             $hasUnassigned = $unassignedCheck && (($unassignedCheck->fetch_assoc()['n'] ?? 0) > 0);
         }
 
         $writer = new SimpleXlsxWriter();
 
         foreach ($companyNames as $cName) {
-            $rowStmt->bind_param('s', $cName);
+            $rowStmt->bind_param('ss', $cName, $branch);
             $rowStmt->execute();
             $res = $rowStmt->get_result();
 
@@ -126,9 +113,10 @@ if ($format === 'xlsx') {
                         sender_name, receiver_name, payment_method, card,
                         remarks, cashier, block, created_at
                  FROM employees
-                 WHERE company IS NULL OR company = ''
+                 WHERE (company IS NULL OR company = '') AND branch = ?
                  ORDER BY created_at ASC"
             );
+            $blankStmt->bind_param('s', $branch);
             $blankStmt->execute();
             $res = $blankStmt->get_result();
             $rows = [];
@@ -169,12 +157,12 @@ $sql = "SELECT name, company, deposit, dinein, takeout, giftcard,
                cashout, interest, sender_amount, receiver_amount,
                sender_name, receiver_name, payment_method, card,
                remarks, cashier, block, created_at
-        FROM employees";
-$params = [];
-$types = "";
+        FROM employees WHERE branch = ?";
+$params = [$branch];
+$types = "s";
 
 if ($company !== '') {
-    $sql .= " WHERE company = ?";
+    $sql .= " AND company = ?";
     $params[] = $company;
     $types .= "s";
 }
@@ -185,9 +173,7 @@ $stmt = $conn->prepare($sql);
 if (!$stmt) {
     die("Query prepare failed: " . $conn->error);
 }
-if (!empty($params)) {
-    $stmt->bind_param($types, ...$params);
-}
+$stmt->bind_param($types, ...$params);
 $stmt->execute();
 $result = $stmt->get_result();
 

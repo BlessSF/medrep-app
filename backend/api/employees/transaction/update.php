@@ -2,6 +2,7 @@
 // POST /api/employees/transaction/update.php  { id, field, value }
 require_once __DIR__ . '/../../../includes/api_helpers.php';
 $username = require_login();
+$branch = current_branch();
 
 $allowed_fields = [
     'dinein' => 'd', 'takeout' => 'd', 'deposit' => 'd', 'cashout' => 'd',
@@ -18,6 +19,13 @@ if ($id <= 0 || !array_key_exists($field, $allowed_fields)) {
     json_error('Invalid field or record id');
 }
 
+// Confirm this record actually belongs to the current branch before touching it.
+$owner_check = $conn->prepare('SELECT id FROM employees WHERE id = ? AND branch = ?');
+$owner_check->bind_param('is', $id, $branch);
+$owner_check->execute();
+if ($owner_check->get_result()->num_rows === 0) json_error('Record not found.', 404);
+$owner_check->close();
+
 $type = $allowed_fields[$field];
 $display = null;
 
@@ -31,8 +39,8 @@ if ($type === 'd') {
     $parsed = strtotime($clean_date_str);
     if ($parsed === false) json_error('Please enter a valid date (e.g. 20-Aug-2026).');
 
-    $time_stmt = $conn->prepare('SELECT created_at FROM employees WHERE id = ?');
-    $time_stmt->bind_param('i', $id);
+    $time_stmt = $conn->prepare('SELECT created_at FROM employees WHERE id = ? AND branch = ?');
+    $time_stmt->bind_param('is', $id, $branch);
     $time_stmt->execute();
     $existing = $time_stmt->get_result()->fetch_assoc();
     $time_stmt->close();
@@ -49,12 +57,12 @@ if ($type === 'd') {
     $display = strtoupper($value);
 }
 
-$sql = "UPDATE employees SET `$field` = ? WHERE id = ?";
+$sql = "UPDATE employees SET `$field` = ? WHERE id = ? AND branch = ?";
 $stmt = $conn->prepare($sql);
 if (!$stmt) json_error('Query preparation failed', 500);
 
-if ($type === 'd') { $stmt->bind_param('di', $value, $id); }
-else { $stmt->bind_param('si', $value, $id); }
+if ($type === 'd') { $stmt->bind_param('dis', $value, $id, $branch); }
+else { $stmt->bind_param('sis', $value, $id, $branch); }
 
 $ok = $stmt->execute();
 $stmt->close();

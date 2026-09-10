@@ -2,6 +2,7 @@
 // GET /api/reports/receivables.php?type=receivable|payable&scope=alltime|filtered|date&month=&year=&date=&range_from=&range_to=
 require_once __DIR__ . '/../../includes/api_helpers.php';
 require_login();
+$branch = current_branch();
 
 $type = (($_GET['type'] ?? 'receivable') === 'payable') ? 'payable' : 'receivable';
 $scope = in_array($_GET['scope'] ?? '', ['alltime', 'filtered', 'date'], true) ? $_GET['scope'] : 'alltime';
@@ -20,7 +21,7 @@ if ($use_range && $range_from > $range_to) {
     [$range_from, $range_to] = [$range_to, $range_from];
 }
 
-$where_clauses = ["(block IS NULL OR LOWER(TRIM(block)) <> 'block')"];
+$where_clauses = ["branch = '" . $conn->real_escape_string($branch) . "'", "(block IS NULL OR LOWER(TRIM(block)) <> 'block')"];
 if ($scope === 'filtered') {
     if ($use_range) {
         $safe_from = $conn->real_escape_string($range_from);

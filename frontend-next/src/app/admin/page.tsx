@@ -8,11 +8,13 @@ import api from '../../api/client';
 import { dateStr, money } from '../../lib/format';
 
 function DashboardPage() {
+  console.log("ADMIN AOAGE");
   const [data, setData] = useState<any | null>(null);
 
   useEffect(() => {
     api.get('/reports/dashboard.php').then(setData);
   }, []);
+
 
   if (!data) return <Layout><div className="empty-state">Loading…</div></Layout>;
 

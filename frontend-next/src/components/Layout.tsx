@@ -17,12 +17,13 @@ const ADMIN_LINKS = [
   { to: '/admin/cashout', label: 'Cashout Report', icon: '¥' },
   { to: '/admin/users', label: 'Users', icon: <IconUser /> },
   { to: '/admin/tracking', label: 'Tracking', icon: '◎' },
+  { to: '/admin/branches', label: 'Branches', icon: '⌂' },
 ];
 
 const CASHIER_LINKS = [{ to: '/staff', label: 'Daily Transaction', icon: '◧' }];
 
 export default function Layout({ children }: { children: ReactNode }) {
-  const { username, role, logout } = useAuth();
+  const { username, role, branch, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const links = role === 'admin' ? ADMIN_LINKS : CASHIER_LINKS;
@@ -37,7 +38,7 @@ export default function Layout({ children }: { children: ReactNode }) {
       <nav className="sidebar">
         <div className="sidebar-brand">
           <strong>MEDREP</strong>
-          STELLA
+          {branch || '—'}
         </div>
         <div className="sidebar-user">
           Hello,
