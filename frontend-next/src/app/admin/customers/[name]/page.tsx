@@ -16,7 +16,8 @@ function CustomerProfilePage() {
   const [year, setYear] = useState(new Date().getFullYear());
   const [month, setMonth] = useState<number | ''>('');
   const [msg, setMsg] = useState<{ text: string; kind: 'success' | 'error' } | null>(null);
-  const [quickAdd, setQuickAdd] = useState({ type: 'dinein', amount: '', payment_method: 'na', remarks: '' });
+  const [quickAdd, setQuickAdd] = useState({ type: 'dinein', amount: '', payment_method: 'na', card: '', remarks: '' });
+  const [bankChoice, setBankChoice] = useState<'maya' | 'metrobank' | 'others'>('maya');
 
   async function load() {
     const r = await api.get(`/employees/profile.php?name=${encodeURIComponent(name)}&year=${year}${month !== '' ? `&month=${month}` : ''}`);
@@ -55,7 +56,7 @@ function CustomerProfilePage() {
         name, company: data?.employee?.company, ...quickAdd, amount: parseFloat(quickAdd.amount || '0'),
       });
       setMsg({ text: r.message, kind: 'success' });
-      setQuickAdd({ type: 'dinein', amount: '', payment_method: 'na', remarks: '' });
+      setQuickAdd({ type: 'dinein', amount: '', payment_method: 'na', card: '', remarks: '' });
       load();
     } catch (err) {
       setMsg({ text: err instanceof ApiError ? err.message : 'Failed to add.', kind: 'error' });
@@ -115,13 +116,55 @@ function CustomerProfilePage() {
             </div>
             <div className="field">
               <label>Payment method</label>
-              <select value={quickAdd.payment_method} onChange={(e) => setQuickAdd((f) => ({ ...f, payment_method: e.target.value }))}>
+              <select
+                value={quickAdd.payment_method}
+                onChange={(e) => {
+                  const pm = e.target.value;
+                  setQuickAdd((f) => ({
+                    ...f,
+                    payment_method: pm,
+                    card: pm === 'card' ? (bankChoice === 'others' ? '' : (bankChoice === 'maya' ? 'Maya' : 'Metro Bank')) : '',
+                  }));
+                }}
+              >
                 <option value="na">N/A</option>
                 <option value="cash">Cash</option>
-                <option value="card">Card</option>
+                <option value="card">Card/Swipe</option>
+                <option value="paid">Paid</option>
                 <option value="giftcard">Gift Card</option>
               </select>
             </div>
+            {quickAdd.payment_method === 'card' && (
+              <div className="field">
+                <label>Bank</label>
+                <select
+                  value={bankChoice}
+                  onChange={(e) => {
+                    const choice = e.target.value as 'maya' | 'metrobank' | 'others';
+                    setBankChoice(choice);
+                    setQuickAdd((f) => ({
+                      ...f,
+                      card: choice === 'maya' ? 'Maya' : choice === 'metrobank' ? 'Metro Bank' : '',
+                    }));
+                  }}
+                >
+                  <option value="maya">Maya</option>
+                  <option value="metrobank">Metro Bank</option>
+                  <option value="others">Others</option>
+                </select>
+              </div>
+            )}
+            {quickAdd.payment_method === 'card' && bankChoice === 'others' && (
+              <div className="field">
+                <label>Specify card/bank name</label>
+                <input
+                  value={quickAdd.card}
+                  onChange={(e) => setQuickAdd((f) => ({ ...f, card: e.target.value }))}
+                  placeholder="Specify card/bank name"
+                  required
+                />
+              </div>
+            )}
             <div className="field">
               <label>Remarks</label>
               <input value={quickAdd.remarks} onChange={(e) => setQuickAdd((f) => ({ ...f, remarks: e.target.value }))} />

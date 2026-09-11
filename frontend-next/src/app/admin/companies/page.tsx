@@ -6,6 +6,7 @@ import Layout from '../../../components/Layout';
 import RequireAuth from '../../../components/RequireAuth';
 import { Banner } from '../../../components/ui';
 import api, { ApiError } from '../../../api/client';
+import { IconEdit } from '../../../components/icons';
 
 function CompaniesPage() {
   const [companies, setCompanies] = useState<any[]>([]);
@@ -88,8 +89,8 @@ function CompaniesPage() {
                     </span>
                   ) : (
                     <>
-                      <Link href={`/admin/customers?company=${encodeURIComponent(c.name)}`}>{c.name}</Link>{' '}
-                      <button className="btn secondary small" onClick={() => { setRenaming(c.id); setRenameValue(c.name); }}>✎</button>
+                      <Link href={`/admin/companies/${encodeURIComponent(c.name)}`}>{c.name}</Link>{' '}
+                      <button className="icon-btn" title="Rename" onClick={() => { setRenaming(c.id); setRenameValue(c.name); }}><IconEdit /></button>
                     </>
                   )}
                 </td>

@@ -31,6 +31,7 @@ function StaffPage() {
     name: '', company: '', amount: '', type: 'deposit',
     payment_method: 'na', card: '', remarks: '', transfer_name: '', transfer_company: '',
   });
+  const [bankChoice, setBankChoice] = useState<'maya' | 'metrobank' | 'others'>('maya');
 
   async function loadMedreps() {
     const r = await api.get('/employees/medreps.php');
@@ -116,17 +117,55 @@ function StaffPage() {
             <div className="form-row">
               <div className="field">
                 <label>Payment method</label>
-                <select value={form.payment_method} onChange={(e) => updateField('payment_method', e.target.value)}>
+                <select
+                  value={form.payment_method}
+                  onChange={(e) => {
+                    const pm = e.target.value;
+                    updateField('payment_method', pm);
+                    if (pm === 'card') {
+                      // Re-apply whichever bank choice was last selected
+                      // (or default to Maya) so `card` always has a value.
+                      updateField('card', bankChoice === 'others' ? '' : (bankChoice === 'maya' ? 'Maya' : 'Metro Bank'));
+                    } else {
+                      updateField('card', '');
+                    }
+                  }}
+                >
                   <option value="na">N/A</option>
                   <option value="cash">Cash</option>
-                  <option value="card">Card</option>
+                  <option value="card">Card/Swipe</option>
+                  <option value="paid">Paid</option>
                   <option value="giftcard">Gift Card</option>
                 </select>
               </div>
               {form.payment_method === 'card' && (
                 <div className="field">
-                  <label>Card note</label>
-                  <input value={form.card} onChange={(e) => updateField('card', e.target.value)} />
+                  <label>Bank</label>
+                  <select
+                    value={bankChoice}
+                    onChange={(e) => {
+                      const choice = e.target.value as 'maya' | 'metrobank' | 'others';
+                      setBankChoice(choice);
+                      if (choice === 'maya') updateField('card', 'Maya');
+                      else if (choice === 'metrobank') updateField('card', 'Metro Bank');
+                      else updateField('card', '');
+                    }}
+                  >
+                    <option value="maya">Maya</option>
+                    <option value="metrobank">Metro Bank</option>
+                    <option value="others">Others</option>
+                  </select>
+                </div>
+              )}
+              {form.payment_method === 'card' && bankChoice === 'others' && (
+                <div className="field">
+                  <label>Specify card/bank name</label>
+                  <input
+                    value={form.card}
+                    onChange={(e) => updateField('card', e.target.value)}
+                    placeholder="Specify card/bank name"
+                    required
+                  />
                 </div>
               )}
             </div>
