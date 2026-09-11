@@ -13,14 +13,15 @@ function CustomerProfilePage() {
   const params = useParams();
   const name = decodeURIComponent(String(params.name || ''));
   const [data, setData] = useState<any | null>(null);
-  const [year, setYear] = useState(new Date().getFullYear());
+  // '' now means "All years" instead of defaulting to the current year.
+  const [year, setYear] = useState<number | ''>(new Date().getFullYear());
   const [month, setMonth] = useState<number | ''>('');
   const [msg, setMsg] = useState<{ text: string; kind: 'success' | 'error' } | null>(null);
   const [quickAdd, setQuickAdd] = useState({ type: 'dinein', amount: '', payment_method: 'na', card: '', remarks: '' });
   const [bankChoice, setBankChoice] = useState<'maya' | 'metrobank' | 'others'>('maya');
 
   async function load() {
-    const r = await api.get(`/employees/profile.php?name=${encodeURIComponent(name)}&year=${year}${month !== '' ? `&month=${month}` : ''}`);
+    const r = await api.get(`/employees/profile.php?name=${encodeURIComponent(name)}${year !== '' ? `&year=${year}` : ''}${month !== '' ? `&month=${month}` : ''}`);
     setData(r);
   }
 
@@ -74,15 +75,37 @@ function CustomerProfilePage() {
     load();
   }
 
+  // Download links for this medrep's transactions, honoring whatever
+  // year/month filter is currently applied to the table above.
+  function exportUrl(format: 'csv' | 'xlsx' | 'pdf') {
+    const params = new URLSearchParams({ medrep: name, format });
+    if (year !== '') params.set('year', String(year));
+    if (month !== '') params.set('month', String(month));
+    return api.rawUrl(`/export.php?${params.toString()}`);
+  }
+
   if (!data) return <Layout><div className="empty-state">Loading…</div></Layout>;
 
   const t = data.totals;
+  const yearlySummary: Array<{ year: number; net: number }> = data.yearly_summary || [];
+
+  // Options for the year filter: "All years" plus a range covering every
+  // year that actually has history for this customer (falls back to a
+  // handful of recent years if there's no history yet).
+  const currentYear = new Date().getFullYear();
+  const historyYears = yearlySummary.map((y) => y.year);
+  const minYear = historyYears.length ? Math.min(...historyYears, currentYear) : currentYear - 5;
+  const yearOptions: number[] = [];
+  for (let y = currentYear; y >= minYear; y--) yearOptions.push(y);
 
   return (
-    <Layout>
+    <Layout
+      sidebarStatus={
+        <span className={`sidebar-status-dot ${data.blocked ? 'blocked' : 'active'}`} title={data.blocked ? 'Blocked' : 'Active'} />
+      }
+    >
       <div className="topline">
         <h1>{data.employee.name}</h1>
-        <span className={`badge ${data.blocked ? 'blocked' : 'active'}`}>{data.blocked ? 'Blocked' : 'Active'}</span>
       </div>
       <p className="muted" style={{ marginTop: -12, marginBottom: 16 }}>{data.employee.company}</p>
       <Banner message={msg?.text || ''} kind={msg?.kind || 'success'} />
@@ -94,6 +117,19 @@ function CustomerProfilePage() {
         <StatCard label="Total cashed out" value={money(t.total_cashout)} />
         <StatCard label="Gift card balance" value={money(t.giftcard_balance)} />
       </div>
+
+      {yearlySummary.length > 0 && (
+        <div className="card" style={{ marginBottom: 20 }}>
+          <h2 style={{ marginBottom: 12 }}>Yearly summary</h2>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            {yearlySummary.map((y) => (
+              <span key={y.year} className={`balance-pill ${y.net < 0 ? 'receivable' : 'payable'}`}>
+                {y.year}: {y.net < 0 ? 'Payable' : 'Balance'} {money(Math.abs(y.net))}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="card" style={{ marginBottom: 20 }}>
         <h2>Quick add transaction</h2>
@@ -177,19 +213,25 @@ function CustomerProfilePage() {
       <div className="card">
         <div className="topline" style={{ marginBottom: 12 }}>
           <h2>Transaction history</h2>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <select value={month} onChange={(e) => setMonth(e.target.value === '' ? '' : Number(e.target.value))}>
               <option value="">All months</option>
               {MONTH_NAMES.slice(1).map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
             </select>
-            <input type="number" style={{ width: 90 }} value={year} onChange={(e) => setYear(Number(e.target.value))} />
+            <select value={year} onChange={(e) => setYear(e.target.value === '' ? '' : Number(e.target.value))}>
+              <option value="">All years</option>
+              {yearOptions.map((y) => <option key={y} value={y}>{y}</option>)}
+            </select>
+            <a className="btn secondary small" href={exportUrl('csv')} target="_blank" rel="noopener noreferrer">⇩ CSV</a>
+            <a className="btn secondary small" href={exportUrl('xlsx')} target="_blank" rel="noopener noreferrer">⇩ Excel</a>
+            <a className="btn secondary small" href={exportUrl('pdf')} target="_blank" rel="noopener noreferrer">⇩ PDF</a>
           </div>
         </div>
         <div className="table-scroll">
         <table className="col-divided">
           <thead>
             <tr>
-              <th className="nowrap-cell" style={{ background: 'var(--forest)', color: '#fff' }}>Date</th><th>Cashier</th>
+              <th className="nowrap-cell">Date</th><th>Cashier</th>
               <th className="num">Dine In</th><th className="num">Takeout</th><th className="num">Deposit</th>
               <th className="num">Cashout</th><th className="num">Interest</th><th className="num">Gift Card</th>
               <th>Transfer Name</th><th className="num">Transfer Amount</th>

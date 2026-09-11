@@ -37,7 +37,7 @@ const ADMIN_LINKS = [
 
 const CASHIER_LINKS = [{ to: '/staff', label: 'Daily Transaction', icon: '◧' }];
 
-export default function Layout({ children }: { children: ReactNode }) {
+export default function Layout({ children, sidebarStatus }: { children: ReactNode; sidebarStatus?: ReactNode }) {
   const { username, role, branch, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
@@ -100,8 +100,7 @@ export default function Layout({ children }: { children: ReactNode }) {
         <div className="sidebar-user bottom">
           <span className="user-avatar" style={{ background: theme.accent }}>{(username || '?').charAt(0).toUpperCase()}</span>
           <span className="user-text">
-            <small>Hello,</small>
-            <strong>{username}</strong>
+            <strong>{username}{sidebarStatus}</strong>
             <span className="user-role-badge">{role}</span>
           </span>
           <button className="logout-icon-btn" onClick={handleLogout} title="Log out">

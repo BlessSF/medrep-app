@@ -40,6 +40,16 @@ export function IconTrash({ size = 15 }: IconProps) {
   );
 }
 
+export function IconDownload({ size = 15 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" {...base}>
+      <path d="M12 3v12" />
+      <path d="M7.5 10.5L12 15l4.5-4.5" />
+      <path d="M4 19h16" />
+    </svg>
+  );
+}
+
 export function IconBan({ size = 15 }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" {...base}>

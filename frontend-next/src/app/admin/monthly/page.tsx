@@ -41,7 +41,10 @@ function MonthlyPage() {
               {companies.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
-          <button className="btn secondary" onClick={load}>Search</button>
+          <div className="field" style={{ flex: '0 0 auto', minWidth: 0 }}>
+            <label>&nbsp;</label>
+            <button className="btn secondary" onClick={load}>Search</button>
+          </div>
         </div>
 
         <table>
@@ -53,8 +56,8 @@ function MonthlyPage() {
           </thead>
           <tbody>
             {rows.length === 0 && <tr><td colSpan={8} className="empty-state">No results.</td></tr>}
-            {rows.map((r, index) => (
-              <tr key={index}>
+            {rows.map((r) => (
+              <tr key={r.name}>
                 <td><Link href={`/admin/customers/${encodeURIComponent(r.name)}`}>{r.name}</Link></td>
                 <td>{r.company}</td>
                 <td className="num">{money(r.total_deposit)}</td>

@@ -40,8 +40,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 // SameSite=Lax works fine here and — unlike SameSite=None — doesn't
 // require Secure/HTTPS, which is what was silently blocking every
 // session cookie on plain http://localhost.
+$session_lifetime = 60 * 60 * 24 * 30; // 30 days
+// The cookie's own expiry (above) only controls the browser's copy. PHP
+// separately garbage-collects the session's DATA on the server after
+// session.gc_maxlifetime seconds (default ~24 minutes!) regardless of the
+// cookie, so without this a "persistent" login would still silently die
+// after sitting idle for less than half an hour.
+ini_set('session.gc_maxlifetime', (string)$session_lifetime);
 session_set_cookie_params([
-    'lifetime' => 0,
+    'lifetime' => $session_lifetime,
     'path' => '/',
     'samesite' => 'Lax',
     'secure' => (($_SERVER['HTTPS'] ?? '') !== '' || ($_SERVER['SERVER_PORT'] ?? '') == 443),

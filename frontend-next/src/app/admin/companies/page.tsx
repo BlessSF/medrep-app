@@ -64,7 +64,10 @@ function CompaniesPage() {
             <label>Company name</label>
             <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="e.g. Acme Corp" required />
           </div>
-          <button className="btn" type="submit">+ Add company</button>
+          <div className="field" style={{ flex: '0 0 auto', minWidth: 0 }}>
+            <label>&nbsp;</label>
+            <button className="btn" type="submit">+ Add company</button>
+          </div>
         </form>
       </div>
 

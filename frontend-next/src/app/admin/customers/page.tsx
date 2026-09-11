@@ -1,13 +1,14 @@
 'use client';
 
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState, Suspense, type FormEvent } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Layout from '../../../components/Layout';
 import RequireAuth from '../../../components/RequireAuth';
 import { Banner, Modal } from '../../../components/ui';
 import api, { ApiError } from '../../../api/client';
 import { money, dateStr } from '../../../lib/format';
-import { IconEdit, IconBan, IconCheck, IconTrash } from '../../../components/icons';
+import { IconEdit, IconBan, IconCheck, IconTrash, IconDownload } from '../../../components/icons';
 
 interface Medrep {
   name: string;
@@ -20,6 +21,8 @@ interface Medrep {
 }
 
 function CustomersPage() {
+  const searchParams = useSearchParams();
+  const companyFilter = searchParams.get('company') || '';
   const [medreps, setMedreps] = useState<Medrep[]>([]);
   const [companies, setCompanies] = useState<string[]>([]);
   const [q, setQ] = useState('');
@@ -30,19 +33,20 @@ function CustomersPage() {
   const [editForm, setEditForm] = useState({ edit_name: '', edit_company: '' });
 
   async function load() {
-    const r = await api.get(`/employees/medreps.php${q ? `?q=${encodeURIComponent(q)}` : ''}`);
+    const params = new URLSearchParams();
+    if (q) params.set('q', q);
+    if (companyFilter) params.set('company', companyFilter);
+    const qs = params.toString();
+    const r = await api.get(`/employees/medreps.php${qs ? `?${qs}` : ''}`);
     setMedreps(r.medreps);
   }
 
   async function loadCompanies() {
-    console.log("FETCHING");
     const r = await api.get('/companies/index.php');
-    console.log("DATA DATA : ", r);
     setCompanies(r.companies.map((c: any) => c.name).sort());
   }
 
-  useEffect(() => { load(); loadCompanies(); }, []);
-
+  useEffect(() => { loadCompanies(); }, []);
 
   async function addMedrep(e: FormEvent) {
     e.preventDefault();
@@ -96,6 +100,8 @@ function CustomersPage() {
     }
   }
 
+  useEffect(() => { load(); }, [companyFilter]);
+
   return (
     <Layout>
       <div className="topline">
@@ -105,6 +111,12 @@ function CustomersPage() {
       <Banner message={msg?.text || ''} kind={msg?.kind || 'success'} />
 
       <div className="card">
+        {companyFilter && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <span className="badge active">Filtering by company: {companyFilter}</span>
+            <Link href="/admin/customers" className="btn secondary small">Clear filter</Link>
+          </div>
+        )}
         <input
           className="search-input"
           placeholder="Search name or company…"
@@ -117,7 +129,7 @@ function CustomersPage() {
           <thead>
             <tr>
               <th>Name</th><th>Company</th><th className="num">Deposit</th><th className="num">Payable</th>
-              <th className="num">Balance</th><th>Type</th><th className="nowrap-cell" style={{ background: 'var(--forest)', color: '#fff' }}>Submitted</th><th>Status</th><th>Actions</th>
+              <th className="num">Balance</th><th>Type</th><th className="nowrap-cell">Submitted</th><th>Status</th><th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -140,6 +152,15 @@ function CustomersPage() {
                 <td><span className={`badge ${m.blocked ? 'blocked' : 'active'}`}>{m.blocked ? 'Blocked' : 'Active'}</span></td>
                 <td className="actions-cell">
                   <div className="action-group">
+                    <a
+                      className="icon-btn"
+                      title="Download transactions (CSV)"
+                      href={api.rawUrl(`/export.php?medrep=${encodeURIComponent(m.name)}`)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <IconDownload />
+                    </a>
                     <button className="icon-btn" title="Edit" onClick={() => openEdit(m)}><IconEdit /></button>
                     <button
                       className={`icon-btn ${m.blocked ? '' : 'warn'}`}
@@ -212,7 +233,9 @@ function CustomersPage() {
 export default function Page() {
   return (
     <RequireAuth role="admin">
-      <CustomersPage />
+      <Suspense fallback={<Layout><div className="empty-state">Loading…</div></Layout>}>
+        <CustomersPage />
+      </Suspense>
     </RequireAuth>
   );
 }

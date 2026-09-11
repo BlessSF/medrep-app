@@ -78,7 +78,10 @@ function UsersPage() {
               <option value="admin">Admin</option>
             </select>
           </div>
-          <button className="btn" type="submit">Add user</button>
+          <div className="field" style={{ flex: '0 0 auto', minWidth: 0 }}>
+            <label>&nbsp;</label>
+            <button className="btn" type="submit">Add user</button>
+          </div>
         </form>
       </div>
 

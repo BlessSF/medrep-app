@@ -7,12 +7,14 @@
 //  PhpSpreadsheet. An .xlsx file is just a zip of XML files, so
 //  this assembles that structure by hand.
 //
-//  Styling: green header row (bold white text), thin borders,
-//  light-green banded rows, frozen header + autofilter, and
-//  auto-sized columns — to match the app's green theme.
+//  Styling: a colored header row (bold white text), thin borders,
+//  a lightly-tinted banded row, frozen header + autofilter, and
+//  auto-sized columns — colors are themeable per branch (e.g. HERO
+//  is red, STELLA is green) so the exported file matches whichever
+//  branch generated it.
 //
 //  Usage:
-//      $writer = new SimpleXlsxWriter();
+//      $writer = new SimpleXlsxWriter(SimpleXlsxWriter::colorsForBranch($branch));
 //      $writer->addSheet('Acme Corp', $headers, $rows);
 //      $writer->addSheet('Other Co',  $headers, $rows2);
 //      $writer->output('transactions_by_company.xlsx');
@@ -25,10 +27,17 @@
 
 class SimpleXlsxWriter
 {
-    // Brand green used for the header fill (matches the app's sidebar green).
-    private const HEADER_FILL_RGB = 'FF1E5B33';
-    private const BAND_FILL_RGB   = 'FFE9F5EC';
-    private const BORDER_RGB      = 'FFC9DED0';
+    // Default theme (used when no colors are passed in): matches the
+    // app's HERO branch red (#c0392b).
+    private const DEFAULT_HEADER_FILL_RGB = 'FFC0392B';
+    private const DEFAULT_BAND_FILL_RGB   = 'FFFBEBEA';
+    private const DEFAULT_BORDER_RGB      = 'FFEEC6C2';
+
+    // Per-instance colors — set in the constructor, defaulting to the
+    // HERO red theme above when nothing is passed in.
+    private string $headerFillRgb;
+    private string $bandFillRgb;
+    private string $borderRgb;
 
     // Style (cellXfs) indices — fixed layout, see stylesXml().
     private const STYLE_HEADER      = 1;
@@ -39,6 +48,34 @@ class SimpleXlsxWriter
 
     /** @var array<int, array{name:string, headers:array, rows:array}> */
     private $sheets = [];
+
+    /**
+     * @param array{header?:string, band?:string, border?:string} $colors
+     *        ARGB hex strings (e.g. 'FFC0392B'). Any key left out falls
+     *        back to the default red theme. Use colorsForBranch() to
+     *        build this from a branch name instead of hardcoding it.
+     */
+    public function __construct(array $colors = [])
+    {
+        $this->headerFillRgb = $colors['header'] ?? self::DEFAULT_HEADER_FILL_RGB;
+        $this->bandFillRgb   = $colors['band']   ?? self::DEFAULT_BAND_FILL_RGB;
+        $this->borderRgb     = $colors['border'] ?? self::DEFAULT_BORDER_RGB;
+    }
+
+    /**
+     * Branch -> color theme, mirroring BRANCH_THEMES in
+     * frontend-next/src/components/Layout.tsx so Excel exports match
+     * each branch's sidebar/brand color. Add new branches to both places.
+     */
+    public static function colorsForBranch(?string $branch): array
+    {
+        $themes = [
+            'HERO'   => ['header' => 'FFC0392B', 'band' => 'FFFBEBEA', 'border' => 'FFEEC6C2'], // red
+            'STELLA' => ['header' => 'FF1B4332', 'band' => 'FFE9F5EC', 'border' => 'FFC9DED0'], // green
+        ];
+        $key = strtoupper((string)$branch);
+        return $themes[$key] ?? $themes['STELLA']; // unlisted branches fall back to green, same as the frontend default theme
+    }
 
     /**
      * Queue up a worksheet. Sheet names are sanitized and de-duplicated
@@ -52,6 +89,7 @@ class SimpleXlsxWriter
             'rows'    => $rows,
         ];
     }
+
 
     /** Sends the workbook to the browser as a download and exits. */
     public function output(string $filename): void
@@ -195,7 +233,7 @@ class SimpleXlsxWriter
 
         $xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
         $xml .= '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">';
-        $xml .= '<sheetPr><tabColor rgb="' . self::HEADER_FILL_RGB . '"/></sheetPr>';
+        $xml .= '<sheetPr><tabColor rgb="' . $this->headerFillRgb . '"/></sheetPr>';
         $xml .= '<dimension ref="A1:' . $lastCol . $lastRow . '"/>';
         $xml .= '<sheetViews><sheetView showGridLines="0" workbookViewId="0">'
               . '<pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/>'
@@ -213,7 +251,7 @@ class SimpleXlsxWriter
 
         $xml .= '<sheetData>';
 
-        // Header row — bold white text on green fill
+        // Header row — bold white text on red fill
         $xml .= '<row r="1" ht="20" customHeight="1">';
         foreach ($headers as $i => $h) {
             $col = self::columnLetter($i + 1) . '1';
@@ -224,7 +262,7 @@ class SimpleXlsxWriter
 
         $r = 2;
         foreach ($rows as $row) {
-            $isBand = ($r % 2 === 0); // banded (light green) on even rows
+            $isBand = ($r % 2 === 0); // banded (light red/pink) on even rows
             $xml .= '<row r="' . $r . '">';
             foreach (array_values($row) as $i => $val) {
                 $col = self::columnLetter($i + 1) . $r;
@@ -317,16 +355,16 @@ class SimpleXlsxWriter
     private function stylesXml(): string
     {
         // Fonts: 0 = default, 1 = bold white (header)
-        // Fills: 0 = none, 1 = gray125 (reserved slot Excel expects), 2 = green (header), 3 = light green (banded rows)
-        // Borders: 0 = none, 1 = thin light-green border on all sides
+        // Fills: 0 = none, 1 = gray125 (reserved slot Excel expects), 2 = red (header), 3 = light red/pink (banded rows)
+        // Borders: 0 = none, 1 = thin light-red border on all sides
         //
         // cellXfs (referenced by cell s="N"):
         //   0 default          — unused directly, base style
-        //   1 STYLE_HEADER      — bold white on green, centered, thin border
+        //   1 STYLE_HEADER      — bold white on red, centered, thin border
         //   2 STYLE_TEXT        — thin border, plain white background
-        //   3 STYLE_TEXT_BAND   — thin border, light-green banded background
+        //   3 STYLE_TEXT_BAND   — thin border, light-red/pink banded background
         //   4 STYLE_NUMBER      — thin border, number format, plain background
-        //   5 STYLE_NUMBER_BAND — thin border, number format, light-green banded background
+        //   5 STYLE_NUMBER_BAND — thin border, number format, light-red/pink banded background
         return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
             . '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
             . '<fonts count="2">'
@@ -336,16 +374,16 @@ class SimpleXlsxWriter
             . '<fills count="4">'
             . '<fill><patternFill patternType="none"/></fill>'
             . '<fill><patternFill patternType="gray125"/></fill>'
-            . '<fill><patternFill patternType="solid"><fgColor rgb="' . self::HEADER_FILL_RGB . '"/><bgColor indexed="64"/></patternFill></fill>'
-            . '<fill><patternFill patternType="solid"><fgColor rgb="' . self::BAND_FILL_RGB . '"/><bgColor indexed="64"/></patternFill></fill>'
+            . '<fill><patternFill patternType="solid"><fgColor rgb="' . $this->headerFillRgb . '"/><bgColor indexed="64"/></patternFill></fill>'
+            . '<fill><patternFill patternType="solid"><fgColor rgb="' . $this->bandFillRgb . '"/><bgColor indexed="64"/></patternFill></fill>'
             . '</fills>'
             . '<borders count="2">'
             . '<border><left/><right/><top/><bottom/><diagonal/></border>'
             . '<border>'
-            . '<left style="thin"><color rgb="' . self::BORDER_RGB . '"/></left>'
-            . '<right style="thin"><color rgb="' . self::BORDER_RGB . '"/></right>'
-            . '<top style="thin"><color rgb="' . self::BORDER_RGB . '"/></top>'
-            . '<bottom style="thin"><color rgb="' . self::BORDER_RGB . '"/></bottom>'
+            . '<left style="thin"><color rgb="' . $this->borderRgb . '"/></left>'
+            . '<right style="thin"><color rgb="' . $this->borderRgb . '"/></right>'
+            . '<top style="thin"><color rgb="' . $this->borderRgb . '"/></top>'
+            . '<bottom style="thin"><color rgb="' . $this->borderRgb . '"/></bottom>'
             . '<diagonal/>'
             . '</border>'
             . '</borders>'

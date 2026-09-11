@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import Layout from '../../../../components/Layout';
 import RequireAuth from '../../../../components/RequireAuth';
-import { StatCard } from '../../../../components/ui';
-import api from '../../../../api/client';
+import { StatCard, Modal, Banner } from '../../../../components/ui';
+import api, { ApiError } from '../../../../api/client';
 import { money, dateStr } from '../../../../lib/format';
 
 interface Medrep {
@@ -23,11 +23,29 @@ function CompanyProfilePage() {
   const params = useParams();
   const name = decodeURIComponent(String(params.name || ''));
   const [medreps, setMedreps] = useState<Medrep[] | null>(null);
+  const [showAdd, setShowAdd] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [msg, setMsg] = useState<{ text: string; kind: 'success' | 'error' } | null>(null);
 
-  useEffect(() => {
-    if (!name) return;
-    api.get(`/employees/medreps.php?company=${encodeURIComponent(name)}`).then((r) => setMedreps(r.medreps));
-  }, [name]);
+  async function load() {
+    const r = await api.get(`/employees/medreps.php?company=${encodeURIComponent(name)}`);
+    setMedreps(r.medreps);
+  }
+
+  useEffect(() => { if (name) load(); }, [name]);
+
+  async function handleAdd(e: FormEvent) {
+    e.preventDefault();
+    try {
+      const r = await api.post('/employees/medreps.php', { medrep_name: newName, medrep_company: name });
+      setMsg({ text: r.message, kind: 'success' });
+      setNewName('');
+      setShowAdd(false);
+      load();
+    } catch (err) {
+      setMsg({ text: err instanceof ApiError ? err.message : 'Failed to add medrep.', kind: 'error' });
+    }
+  }
 
   const totals = useMemo(() => {
     if (!medreps) return null;
@@ -45,10 +63,14 @@ function CompanyProfilePage() {
 
   return (
     <Layout>
-      <div className="topline"><h1>{name}</h1></div>
+      <div className="topline">
+        <h1>{name}</h1>
+        <button className="btn" onClick={() => setShowAdd(true)}>+ Add medrep</button>
+      </div>
       <p className="muted" style={{ marginTop: -12, marginBottom: 16 }}>
         {medreps.length} medrep{medreps.length === 1 ? '' : 's'} under this company
       </p>
+      <Banner message={msg?.text || ''} kind={msg?.kind || 'success'} />
 
       {totals && (
         <div className="stat-row">
@@ -89,6 +111,22 @@ function CompanyProfilePage() {
           </tbody>
         </table>
       </div>
+
+      {showAdd && (
+        <Modal title={`Add medrep to ${name}`} onClose={() => setShowAdd(false)}>
+          <form onSubmit={handleAdd}>
+            <div className="field">
+              <label>Medrep name</label>
+              <input value={newName} onChange={(e) => setNewName(e.target.value)} required autoFocus />
+            </div>
+            <div className="field">
+              <label>Company</label>
+              <input value={name} disabled />
+            </div>
+            <button className="btn" type="submit">Add medrep</button>
+          </form>
+        </Modal>
+      )}
     </Layout>
   );
 }
