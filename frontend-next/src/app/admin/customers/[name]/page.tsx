@@ -236,11 +236,11 @@ function CustomerProfilePage() {
               <th className="num">Cashout</th><th className="num">Interest</th><th className="num">Gift Card</th>
               <th>Transfer Name</th><th className="num">Transfer Amount</th>
               <th>Payment Method</th><th>Bank</th>
-              <th className="num">Running Total</th><th>Type</th><th>Status</th><th>Actions</th>
+              <th className="num">Running Total</th><th>Type</th><th>Status</th><th>Remarks</th><th>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {data.records.length === 0 && <tr><td colSpan={16} className="empty-state">No transactions in this period.</td></tr>}
+            {data.records.length === 0 && <tr><td colSpan={17} className="empty-state">No transactions in this period.</td></tr>}
             {data.records.map((r: any) => {
               const running = runningTotals.get(r.id) ?? 0;
               const transferName = r.sender_amount > 0 ? r.receiver_name : (r.receiver_amount > 0 ? r.sender_name : '');
@@ -268,6 +268,7 @@ function CustomerProfilePage() {
                     ? <span className="badge blocked">Blocked</span>
                     : <span className="badge active">Active</span>}
                 </td>
+                <td className="muted"><EditableCell value={r.remarks || ''} onSave={(v) => updateField(r.id, 'remarks', v)} /></td>
                 <td className="actions-cell">
                   <button className="icon-btn danger" title="Delete" onClick={() => deleteRow(r.id)}><IconTrash /></button>
                 </td>
