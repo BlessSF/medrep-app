@@ -8,7 +8,7 @@ import api, { ApiError } from '../../api/client';
 // Map branch names to their hero images (place images in /public/)
 const BRANCH_IMAGES: Record<string, string> = {
   HERO: '/hero-hero.png',
-  DOIS: '/dois-hero.png',
+  DOIS: '/dois-hero.jpg',
   STELLA: '/stella-hero.png',
 };
 
