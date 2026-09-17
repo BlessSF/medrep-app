@@ -495,6 +495,16 @@ td.actions-cell { width: 1%; white-space: nowrap; }
   color: rgba(255,255,255,0.65);
   margin-top: 2px;
 }
+.login-hero-badge-branch {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.9);
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255,255,255,0.2);
+}
 
 .login-hero-branch-tag {
   position: absolute;

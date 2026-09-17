@@ -8,11 +8,15 @@ import api, { ApiError } from '../../api/client';
 // Map branch names to their hero images (place images in /public/)
 const BRANCH_IMAGES: Record<string, string> = {
   HERO: '/hero-hero.png',
-  // Add more branches here as needed:
-  // BRANCH_NAME: '/branch-name-hero.png',
+  DOIS: '/dois-hero.png',
+  STELLA: '/stella-hero.png',
 };
 
 const DEFAULT_IMAGE = '/hero-hero.png';
+
+function getBranchImage(branch: string): string {
+  return BRANCH_IMAGES[branch?.toUpperCase()] ?? DEFAULT_IMAGE;
+}
 
 export default function Login() {
   const { login } = useAuth();
@@ -26,19 +30,22 @@ export default function Login() {
   const [busy, setBusy] = useState(false);
   const [imgSrc, setImgSrc] = useState(DEFAULT_IMAGE);
 
-  const heroImage = branch && BRANCH_IMAGES[branch] ? BRANCH_IMAGES[branch] : DEFAULT_IMAGE;
-
   useEffect(() => {
     api.get('/branches/list.php').then((r) => {
       setBranches(r.branches);
-      if (r.branches.length > 0) setBranch(r.branches[0]);
+      if (r.branches.length > 0) {
+        const first = r.branches[0];
+        setBranch(first);
+        setImgSrc(getBranchImage(first));
+      }
     }).catch(() => {});
   }, []);
 
-  // Update image src when branch changes
-  useEffect(() => {
-    setImgSrc(heroImage);
-  }, [heroImage]);
+  function handleBranchChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const selected = e.target.value;
+    setBranch(selected);
+    setImgSrc(getBranchImage(selected));
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -64,12 +71,12 @@ export default function Login() {
           src={imgSrc}
           alt={branch || 'Branch'}
           className="login-hero-img loaded"
-          onError={() => setImgSrc('')}
+          onError={() => setImgSrc(DEFAULT_IMAGE)}
         />
         <div className="login-hero-badge">
-          <span className="login-hero-badge-h">H</span>
+          <span className="login-hero-badge-h">{branch ? branch[0] : 'H'}</span>
           <div>
-            <div className="login-hero-badge-title">H Breakfast to Bar</div>
+            <div className="login-hero-badge-title">{branch || 'H Breakfast to Bar'}</div>
             <div className="login-hero-badge-sub">Transaction Ledger System</div>
           </div>
         </div>
@@ -81,7 +88,6 @@ export default function Login() {
       {/* Right panel — form */}
       <div className="login-form-panel">
         <div className="login-form-inner">
-          {/* Logo mark */}
           <div className="login-logo-row">
             <div className="login-logo-mark">
               <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
@@ -108,7 +114,7 @@ export default function Login() {
               <div className="lfield-select-wrap">
                 <select
                   value={branch}
-                  onChange={(e) => setBranch(e.target.value)}
+                  onChange={handleBranchChange}
                   required
                   className="lfield-select"
                 >
