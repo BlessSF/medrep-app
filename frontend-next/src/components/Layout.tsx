@@ -5,34 +5,43 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { IconUser, IconLogout } from './icons';
+import type { BranchSettings } from '../app/admin/branches/page';
 
-// Each branch gets a full sidebar theme (background + accent color for the
-// active nav link / badge), so branches are visually distinct at a glance.
-// Add more branches here as needed — unlisted ones fall back to the
-// original dark-green theme.
-const BRANCH_THEMES: Record<string, { bg: string; bgDark: string; accent: string; badgeText: string; brand: string }> = {
-  HERO: { bg: '#3a1310', bgDark: '#2a0d0b', accent: '#c0392b', badgeText: '#ffffff', brand: '#c0392b' },
-  STELLA: { bg: '#0f2a1f', bgDark: '#0f2a1f', accent: '#3a7350', badgeText: '#1b4332', brand: '#1b4332' },
+function loadBranchSettings(): Record<string, BranchSettings> {
+  try { return JSON.parse(localStorage.getItem('branch_settings') || '{}'); } catch { return {}; }
+}
+
+// Fallback hardcoded themes for branches that haven't been customized yet
+const FALLBACK_THEMES: Record<string, string> = {
+  HERO:   '#c0392b',
+  STELLA: '#1b4332',
+  DOIS:   '#b8540a',
 };
-const DEFAULT_THEME = { bg: '#0f2a1f', bgDark: '#0f2a1f', accent: '#3a7350', badgeText: '#ffffff', brand: '#1b4332' };
+const DEFAULT_COLOR = '#1b4332';
 
-function branchTheme(branch: string | null) {
-  if (!branch) return DEFAULT_THEME;
-  return BRANCH_THEMES[branch.toUpperCase()] ?? DEFAULT_THEME;
+function getThemeColor(branch: string | null, settings: Record<string, BranchSettings>): string {
+  if (!branch) return DEFAULT_COLOR;
+  const key = branch.toUpperCase();
+  return settings[key]?.color ?? FALLBACK_THEMES[key] ?? DEFAULT_COLOR;
+}
+
+function getThemeImage(branch: string | null, settings: Record<string, BranchSettings>): string {
+  if (!branch) return '';
+  return settings[branch.toUpperCase()]?.image ?? '';
 }
 
 const ADMIN_LINKS = [
-  { to: '/admin', label: 'Dashboard', icon: '◧' },
-  { to: '/admin/customers', label: 'Customers', icon: '☰' },
-  { to: '/admin/block', label: 'Block Medrep', icon: '⊘' },
-  { to: '/admin/companies', label: 'Companies', icon: '▤' },
-  { to: '/admin/daily', label: 'Daily Sales', icon: '▦' },
-  { to: '/admin/monthly', label: 'Sales Reports', icon: '▲' },
-  { to: '/admin/receivables', label: 'Receivables', icon: '◆' },
-  { to: '/admin/cashout', label: 'Cashout Report', icon: '¥' },
-  { to: '/admin/users', label: 'Users', icon: <IconUser /> },
-  { to: '/admin/tracking', label: 'Tracking', icon: '◎' },
-  { to: '/admin/branches', label: 'Branches', icon: '⌂' },
+  { to: '/admin',            label: 'Dashboard',     icon: '◧' },
+  { to: '/admin/customers',  label: 'Customers',     icon: '☰' },
+  { to: '/admin/block',      label: 'Block Medrep',  icon: '⊘' },
+  { to: '/admin/companies',  label: 'Companies',     icon: '▤' },
+  { to: '/admin/daily',      label: 'Daily Sales',   icon: '▦' },
+  { to: '/admin/monthly',    label: 'Sales Reports', icon: '▲' },
+  { to: '/admin/receivables',label: 'Receivables',   icon: '◆' },
+  { to: '/admin/cashout',    label: 'Cashout Report',icon: '¥' },
+  { to: '/admin/users',      label: 'Users',         icon: <IconUser /> },
+  { to: '/admin/tracking',   label: 'Tracking',      icon: '◎' },
+  { to: '/admin/branches',   label: 'Branches',      icon: '⌂' },
 ];
 
 const CASHIER_LINKS = [{ to: '/staff', label: 'Daily Transaction', icon: '◧' }];
@@ -43,9 +52,16 @@ export default function Layout({ children, sidebarStatus }: { children: ReactNod
   const pathname = usePathname();
   const links = role === 'admin' ? ADMIN_LINKS : CASHIER_LINKS;
   const [mobileOpen, setMobileOpen] = useState(false);
-  const theme = branchTheme(branch);
+  const [branchSettings, setBranchSettings] = useState<Record<string, BranchSettings>>({});
 
-  // Close the mobile menu automatically whenever the route changes.
+  // Load settings and re-apply whenever they change (e.g. after saving from branches page)
+  useEffect(() => {
+    setBranchSettings(loadBranchSettings());
+    const handler = () => setBranchSettings(loadBranchSettings());
+    window.addEventListener('branch_settings_changed', handler);
+    return () => window.removeEventListener('branch_settings_changed', handler);
+  }, []);
+
   useEffect(() => { setMobileOpen(false); }, [pathname]);
 
   async function handleLogout() {
@@ -53,24 +69,44 @@ export default function Layout({ children, sidebarStatus }: { children: ReactNod
     router.push('/login');
   }
 
+  const color = getThemeColor(branch, branchSettings);
+  const image = getThemeImage(branch, branchSettings);
+
+  // Darken color slightly for hover/dark areas
+  const colorDark = color + 'cc';
+
   return (
     <div
       className="app-shell"
       style={{
-        ['--sidebar-bg' as any]: theme.bg,
-        ['--sidebar-bg-dark' as any]: theme.bgDark,
-        ['--sidebar-accent' as any]: theme.accent,
-        ['--brand-primary' as any]: theme.brand,
+        ['--sidebar-bg' as any]: color + '22',        // very light tint for bg
+        ['--sidebar-bg-dark' as any]: color,
+        ['--sidebar-accent' as any]: color,
+        ['--brand-primary' as any]: color,
       }}
     >
-      <div className="mobile-topbar">
+      {/* Override sidebar background to use solid branch color */}
+      <style>{`
+        .sidebar { background: ${color}ee !important; }
+        .sidebar .nav-link.active { background: rgba(255,255,255,0.15) !important; border-left-color: rgba(255,255,255,0.7) !important; }
+        .sidebar .nav-link:hover { background: rgba(255,255,255,0.08) !important; }
+      `}</style>
+
+      <div className="mobile-topbar" style={{ background: color }}>
         <button className="hamburger-btn" onClick={() => setMobileOpen((v) => !v)} aria-label="Toggle menu">
           <span /><span /><span />
         </button>
         <div className="mobile-brand">
-          <span className="brand-badge small" style={{ background: theme.accent, color: theme.badgeText }}>
-            {(branch || 'M').charAt(0)}
-          </span>
+          <div style={{
+            width: 26, height: 26, borderRadius: 7, overflow: 'hidden',
+            background: 'rgba(255,255,255,0.2)', display: 'flex',
+            alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+          }}>
+            {image
+              ? <img src={image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              : <span style={{ color: '#fff', fontWeight: 800, fontSize: 13 }}>{(branch || 'M').charAt(0)}</span>
+            }
+          </div>
           <strong>MEDREP</strong> {branch || '—'}
         </div>
       </div>
@@ -79,12 +115,20 @@ export default function Layout({ children, sidebarStatus }: { children: ReactNod
 
       <nav className={'sidebar' + (mobileOpen ? ' open' : '')}>
         <div className="sidebar-brand">
-          <span className="brand-badge" style={{ background: theme.accent, color: theme.badgeText }}>
-            {(branch || 'M').charAt(0)}
-          </span>
+          <div style={{
+            width: 38, height: 38, borderRadius: 10, overflow: 'hidden',
+            background: 'rgba(255,255,255,0.15)', flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+          }}>
+            {image
+              ? <img src={image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              : <span style={{ color: '#fff', fontWeight: 800, fontSize: 18 }}>{(branch || 'M').charAt(0)}</span>
+            }
+          </div>
           <span className="brand-text">
             <strong>MEDREP</strong>
-            {branch || '—'}
+            <span>{branch || '—'}</span>
           </span>
         </div>
 
@@ -98,7 +142,9 @@ export default function Layout({ children, sidebarStatus }: { children: ReactNod
         })}
 
         <div className="sidebar-user bottom">
-          <span className="user-avatar" style={{ background: theme.accent }}>{(username || '?').charAt(0).toUpperCase()}</span>
+          <span className="user-avatar" style={{ background: 'rgba(255,255,255,0.2)' }}>
+            {(username || '?').charAt(0).toUpperCase()}
+          </span>
           <span className="user-text">
             <strong>{username}{sidebarStatus}</strong>
             <span className="user-role-badge">{role}</span>
