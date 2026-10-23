@@ -18,7 +18,7 @@ type Item = {
   note: string;
 };
 
-const PAYMENT_MODES = ['Cash', 'GCash', 'Card', 'Bank transfer', 'Other'];
+const PAYMENT_MODES = ['Cash', 'GCash', 'Card', 'Cheque', 'Bank transfer', 'Other'];
 const REMARKS = ['Sold', 'Sponsorship'];
 const PAGE_SIZE = 50;
 
