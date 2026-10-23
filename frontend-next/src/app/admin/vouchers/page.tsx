@@ -48,7 +48,10 @@ function VouchersPage() {
     setMsg({ text, kind });
     setTimeout(() => setMsg(null), 4000);
   };
-  const errText = (e: unknown, fallback: string) => (e instanceof ApiError ? e.message : fallback);
+  const errText = (e: unknown, fallback: string) =>
+    e instanceof ApiError
+      ? e.message
+      : `${fallback} Could not reach /vouchers/index.php (${e instanceof Error ? e.message : 'network error'}) — check the file is uploaded to api/vouchers/ on your PHP host.`;
 
   async function loadList(selectId?: number | null) {
     const r = await api.get('/vouchers/index.php');
@@ -166,8 +169,8 @@ function VouchersPage() {
     const lines = [head.map(esc).join(',')];
     for (let n = 1; n <= beginning; n++) {
       const it = items[n] || blank(n);
-      lines.push([it.date_given, isGivenOut(it) ? 'SOLD OUT' : 'IN STOCK', String(n).padStart(pad, '0'),
-        it.customer_name, it.redeemed_by, it.payment_mode, it.remarks, it.date_availed, it.note].map(esc).join(','));
+      lines.push([longDate(it.date_given), isGivenOut(it) ? 'SOLD OUT' : 'IN STOCK', String(n).padStart(pad, '0'),
+        it.customer_name, it.redeemed_by, it.payment_mode, it.remarks, longDate(it.date_availed), it.note].map(esc).join(','));
     }
     const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
     const a = document.createElement('a');
@@ -259,7 +262,7 @@ function VouchersPage() {
                     const out = isGivenOut(it);
                     return (
                       <tr key={n}>
-                        <td><input type="date" value={it.date_given || ''} onChange={(e) => patch(n, { date_given: e.target.value || null }, true)} /></td>
+                        <td><DateField value={it.date_given} onChange={(v) => patch(n, { date_given: v }, true)} /></td>
                         <td><span className={'vm-pill' + (it.date_availed ? ' availed' : out ? ' out' : '')}>
                           {it.date_availed ? 'Availed' : out ? 'Sold out' : 'In stock'}</span></td>
                         <td className="vm-series">{String(n).padStart(pad, '0')}</td>
@@ -269,7 +272,7 @@ function VouchersPage() {
                           <option value="" />{PAYMENT_MODES.map((o) => <option key={o}>{o}</option>)}</select></td>
                         <td><select value={it.remarks} onChange={(e) => patch(n, { remarks: e.target.value }, true)}>
                           <option value="" />{REMARKS.map((o) => <option key={o}>{o}</option>)}</select></td>
-                        <td><input type="date" value={it.date_availed || ''} onChange={(e) => patch(n, { date_availed: e.target.value || null }, true)} /></td>
+                        <td><DateField value={it.date_availed} onChange={(v) => patch(n, { date_availed: v }, true)} /></td>
                         <td><input value={it.note} onChange={(e) => patch(n, { note: e.target.value }, false)} onBlur={() => saveCurrent(n)} /></td>
                       </tr>
                     );
@@ -309,6 +312,26 @@ function VouchersPage() {
         </Modal>
       )}
     </Layout>
+  );
+}
+
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+function longDate(iso: string | null): string {
+  if (!iso) return '';
+  const [y, m, d] = iso.split('-').map(Number);
+  if (!y || !m || !d) return '';
+  return `${MONTHS[m - 1]} ${d}, ${y}`;
+}
+
+// Shows "January 12, 2026" but still uses the browser's native calendar picker.
+function DateField({ value, onChange }: { value: string | null; onChange: (v: string | null) => void }) {
+  const ref = useRef<HTMLInputElement>(null);
+  return (
+    <div className="vm-date" onClick={() => { try { ref.current?.showPicker(); } catch { ref.current?.focus(); } }}>
+      <span className={value ? '' : 'ph'}>{value ? longDate(value) : 'Pick a date'}</span>
+      <span className="cal">📅</span>
+      <input ref={ref} type="date" value={value || ''} onChange={(e) => onChange(e.target.value || null)} tabIndex={-1} />
+    </div>
   );
 }
 
@@ -375,6 +398,11 @@ const VM_CSS = `
 .vm-table td { padding:8px 8px; border-bottom:1px solid #fbe6d2; vertical-align:middle; }
 .vm-table tbody tr:nth-child(even) { background:var(--o-bg); }
 .vm-table input, .vm-table select { width:100%; padding:9px 10px; border:1px solid var(--o-line); border-radius:10px; background:#fff; font:inherit; font-size:13px; min-width:0; }
+.vm-date { position:relative; display:flex; align-items:center; justify-content:space-between; gap:6px; padding:9px 10px; border:1px solid var(--o-line); border-radius:10px; background:#fff; font-size:13px; cursor:pointer; white-space:nowrap; }
+.vm-date:hover { border-color:var(--o); }
+.vm-date .ph { color:#9b8574; }
+.vm-date .cal { font-size:12px; }
+.vm-date input { position:absolute; inset:0; width:100%; height:100%; opacity:0; pointer-events:none; }
 .vm-series { text-align:center; font-weight:800; color:#9b7b62; font-family:var(--mono); }
 .vm-pill { display:inline-block; padding:6px 12px; border-radius:99px; font-size:10.5px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; background:#ffe9d2; color:var(--o-deep); }
 .vm-pill.out { background:var(--o); color:#fff; } .vm-pill.availed { background:#1f2937; color:#fff; }
