@@ -39,6 +39,7 @@ const ADMIN_LINKS = [
   { to: '/admin/monthly',    label: 'Sales Reports', icon: '▲' },
   { to: '/admin/receivables',label: 'Receivables',   icon: '◆' },
   { to: '/admin/cashout',    label: 'Cashout Report',icon: '¥' },
+  { to: '/admin/vouchers',   label: 'Vouchers',      icon: '◈' },
   { to: '/admin/users',      label: 'Users',         icon: <IconUser /> },
   { to: '/admin/tracking',   label: 'Tracking',      icon: '◎' },
   { to: '/admin/branches',   label: 'Branches',      icon: '⌂' },
