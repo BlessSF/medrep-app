@@ -111,6 +111,7 @@ function VouchersPage() {
   const totalOut = rows.reduce((s, v) => s + v.given_out, 0);
   const totalLeft = rows.reduce((s, v) => s + (v.beginning - v.given_out), 0);
 
+  const pad = Math.max(3, String(beginning).length);
   const series = useMemo(() => {
     const needle = q.trim().toLowerCase();
     const out: number[] = [];
@@ -118,19 +119,18 @@ function VouchersPage() {
       const it = items[n];
       if (onlyGiven && !isGivenOut(it)) continue;
       if (needle) {
-        const hay = [String(n), it?.customer_name, it?.redeemed_by, it?.payment_mode, it?.remarks, it?.note, it?.date_given, it?.date_availed]
+        const hay = [String(n), String(n).padStart(pad, '0'), it?.customer_name, it?.redeemed_by, it?.payment_mode, it?.remarks, it?.note, it?.date_given, it?.date_availed]
           .filter(Boolean).join(' ').toLowerCase();
         if (!hay.includes(needle)) continue;
       }
       out.push(n);
     }
     return out;
-  }, [items, beginning, q, onlyGiven]);
+  }, [items, beginning, q, onlyGiven, pad]);
 
   const pages = Math.max(1, Math.ceil(series.length / PAGE_SIZE));
   const safePage = Math.min(page, pages - 1);
   const visible = series.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
-  const pad = Math.max(3, String(beginning).length);
 
   async function createVoucher(e: FormEvent) {
     e.preventDefault();
@@ -188,33 +188,32 @@ function VouchersPage() {
       <div className="vm">
         <Banner message={msg?.text || ''} kind={msg?.kind || 'success'} />
 
-        <header className="vm-hero">
-          <div className="vm-hero-icon"><TicketIcon /></div>
-          <div className="vm-hero-text">
+        <header className="vm-head">
+          <div>
             <h1>Voucher Monitoring</h1>
             <p>Track every voucher from stock to customer to redeemed.</p>
           </div>
-          <div className="vm-hero-stats">
-            <div><b>{rows.length}</b><span>Vouchers</span></div>
-            <div><b>{totalOut}</b><span>Given out</span></div>
-            <div><b>{totalLeft}</b><span>Left in stock</span></div>
-          </div>
+          <dl className="vm-head-stats">
+            <div><dd>{rows.length}</dd><dt>Vouchers</dt></div>
+            <div><dd>{totalOut}</dd><dt>Given out</dt></div>
+            <div><dd>{totalLeft}</dd><dt>In stock</dt></div>
+          </dl>
         </header>
 
-        <div className="vm-tabs">
+        <div className="vm-tabs" role="tablist">
           {rows.map((v) => {
             const pct = v.beginning ? Math.min(100, (v.given_out / v.beginning) * 100) : 0;
             return (
-              <button key={v.id} className={'vm-tab' + (v.id === activeId ? ' on' : '')}
+              <button key={v.id} role="tab" aria-selected={v.id === activeId} className={'vm-tab' + (v.id === activeId ? ' on' : '')}
                 onClick={() => v.id !== activeId && openVoucher(v.id)}>
-                <span className="vm-tab-name"><TicketIcon small />{v.name}</span>
-                <span className="vm-tab-meta"><b>{v.given_out}</b> out · <b>{v.beginning - v.given_out}</b> left</span>
+                <span className="vm-tab-name">{v.name}</span>
+                <span className="vm-tab-meta">{v.given_out} / {v.beginning} out</span>
                 <span className="vm-bar"><i style={{ width: pct + '%' }} /></span>
               </button>
             );
           })}
           <button className="vm-tab vm-new" onClick={() => { setFormName(''); setFormQty(''); setModal('new'); }}>
-            <span className="vm-plus">+</span> New voucher
+            + New voucher
           </button>
         </div>
 
@@ -224,25 +223,23 @@ function VouchersPage() {
         {active && (
           <>
             <div className="vm-stats">
-              <div className="vm-stat">
-                <label>Beginning</label><b>{active.beginning}</b>
-                <button className="vm-link" onClick={() => { setFormQty(String(active.beginning)); setModal('beginning'); }}>Change</button>
-              </div>
-              <div className="vm-stat"><label>Total out</label><b>{active.given_out}</b><small>vouchers given to customers</small></div>
-              <div className="vm-stat"><label>Ending</label><b>{active.beginning - active.given_out}</b><small>still available</small></div>
-              <div className="vm-stat"><label>Availed</label><b>{active.availed}</b><small>with a date availed</small></div>
+              <div><label>Beginning</label><b>{active.beginning}</b>
+                <button className="vm-link" onClick={() => { setFormQty(String(active.beginning)); setModal('beginning'); }}>Change</button></div>
+              <div><label>Total out</label><b>{active.given_out}</b><small>given to customers</small></div>
+              <div><label>Ending</label><b>{active.beginning - active.given_out}</b><small>still available</small></div>
+              <div><label>Availed</label><b>{active.availed}</b><small>with a date availed</small></div>
             </div>
 
             <div className="vm-toolbar">
-              <input className="vm-search" placeholder="Search this table…" value={q}
+              <input className="vm-search" placeholder="Search series no., name, note…" value={q}
                 onChange={(e) => { setQ(e.target.value); setPage(0); }} />
               <label className="vm-check">
                 <input type="checkbox" checked={onlyGiven} onChange={(e) => { setOnlyGiven(e.target.checked); setPage(0); }} />
                 Show given out only
               </label>
               <span className="vm-spacer" />
-              <button className="vm-btn" onClick={exportExcel}>⇩ Export to Excel</button>
-              <button className="vm-btn danger" onClick={removeVoucher}>🗑 Remove voucher</button>
+              <button className="vm-btn" onClick={exportExcel}>Export to Excel</button>
+              <button className="vm-btn danger" onClick={removeVoucher}>Remove voucher</button>
               <span className={'vm-save ' + save}>{saveLabel}</span>
             </div>
 
@@ -250,8 +247,8 @@ function VouchersPage() {
               <table className="vm-table">
                 <thead>
                   <tr>
-                    <th>Date</th><th>Sold<br />out</th><th>Series<br />no.</th><th>Customer name</th>
-                    <th>Redeemed by</th><th>Mode of payment</th><th>Remarks<br />(sponsorship or sold)</th>
+                    <th>Date</th><th>Status</th><th>Series no.</th><th>Customer name</th>
+                    <th>Redeemed by</th><th>Mode of payment</th><th>Remarks</th>
                     <th>Date availed</th><th>Note (c/o Acctng)</th>
                   </tr>
                 </thead>
@@ -263,8 +260,7 @@ function VouchersPage() {
                     return (
                       <tr key={n}>
                         <td><DateField value={it.date_given} onChange={(v) => patch(n, { date_given: v }, true)} /></td>
-                        <td><span className={'vm-pill' + (it.date_availed ? ' availed' : out ? ' out' : '')}>
-                          {it.date_availed ? 'Availed' : out ? 'Sold out' : 'In stock'}</span></td>
+                        <td><span className={'vm-status' + (it.date_availed ? ' availed' : out ? ' out' : '')}>{it.date_availed ? 'Availed' : out ? 'Sold out' : 'In stock'}</span></td>
                         <td className="vm-series">{String(n).padStart(pad, '0')}</td>
                         <td><input value={it.customer_name} onChange={(e) => patch(n, { customer_name: e.target.value }, false)} onBlur={() => saveCurrent(n)} /></td>
                         <td><input placeholder="Who redeemed it" value={it.redeemed_by} onChange={(e) => patch(n, { redeemed_by: e.target.value }, false)} onBlur={() => saveCurrent(n)} /></td>
@@ -329,7 +325,7 @@ function DateField({ value, onChange }: { value: string | null; onChange: (v: st
   return (
     <div className="vm-date" onClick={() => { try { ref.current?.showPicker(); } catch { ref.current?.focus(); } }}>
       <span className={value ? '' : 'ph'}>{value ? longDate(value) : 'Pick a date'}</span>
-      <span className="cal">📅</span>
+      <svg className="cal" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4" /></svg>
       <input ref={ref} type="date" value={value || ''} onChange={(e) => onChange(e.target.value || null)} tabIndex={-1} />
     </div>
   );
@@ -345,70 +341,76 @@ function TicketIcon({ small }: { small?: boolean }) {
 }
 
 const VM_CSS = `
-.vm { --o:#ea6a0a; --o-dark:#c2410c; --o-deep:#9a3412; --o-soft:#fff1e3; --o-line:#fcd9b6; --o-bg:#fff8f1; }
-.vm-hero { display:flex; align-items:center; gap:16px; flex-wrap:wrap; padding:22px 24px; border-radius:20px; color:#fff;
-  background:linear-gradient(120deg,var(--o-deep),var(--o-dark) 45%,var(--o)); box-shadow:0 8px 22px rgba(194,65,12,.25); }
-.vm-hero-icon { width:54px; height:54px; border-radius:16px; background:rgba(255,255,255,.18); display:grid; place-items:center; }
-.vm-hero-text { flex:1; min-width:220px; }
-.vm-hero-text h1 { margin:0; font-size:26px; font-weight:800; letter-spacing:-.01em; color:#fff; }
-.vm-hero-text p { margin:2px 0 0; font-size:13.5px; opacity:.9; }
-.vm-hero-stats { display:flex; gap:10px; flex-wrap:wrap; }
-.vm-hero-stats div { min-width:96px; text-align:center; padding:10px 14px; border-radius:12px; background:rgba(255,255,255,.16); border:1px solid rgba(255,255,255,.28); }
-.vm-hero-stats b { display:block; font-size:22px; line-height:1.1; }
-.vm-hero-stats span { font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; opacity:.85; }
+.vm { --o:#d9580d; --o-dark:#a8430a; --ink:#2b2118; --mute:#7d6c5e; --line:#e6ddd2; --soft:#faf6f1; --paper:#fff; color:var(--ink); }
+.vm * { box-sizing:border-box; }
 
-.vm-tabs { display:flex; gap:12px; flex-wrap:wrap; margin:18px 0; }
-.vm-tab { text-align:left; cursor:pointer; padding:12px 16px; min-width:200px; border-radius:14px; background:#fff; color:#2a1608;
-  border:1px solid var(--o-line); display:flex; flex-direction:column; gap:6px; font:inherit; box-shadow:0 1px 3px rgba(154,52,18,.08); }
-.vm-tab:hover { border-color:var(--o); }
-.vm-tab-name { display:flex; align-items:center; gap:8px; font-weight:800; font-size:13px; text-transform:uppercase; color:var(--o-dark); }
-.vm-tab-meta { font-size:12px; color:#6b4a30; }
-.vm-bar { height:6px; border-radius:99px; background:#fde4cc; overflow:hidden; }
-.vm-bar i { display:block; height:100%; background:var(--o); border-radius:99px; transition:width .25s; }
-.vm-tab.on { background:linear-gradient(135deg,var(--o-dark),var(--o)); color:#fff; border-color:var(--o-dark); box-shadow:0 6px 16px rgba(194,65,12,.3); }
-.vm-tab.on .vm-tab-name, .vm-tab.on .vm-tab-meta { color:#fff; }
-.vm-tab.on .vm-bar { background:rgba(255,255,255,.3); } .vm-tab.on .vm-bar i { background:#fff; }
-.vm-new { min-width:150px; flex-direction:row; align-items:center; justify-content:center; gap:10px; border:2px dashed var(--o); background:transparent; box-shadow:none; font-weight:800; color:var(--o-dark); }
-.vm-plus { width:28px; height:28px; border-radius:50%; background:var(--o); color:#fff; display:grid; place-items:center; font-size:18px; line-height:1; }
+.vm-head { display:flex; justify-content:space-between; align-items:flex-end; gap:20px; flex-wrap:wrap;
+  padding:0 0 16px; border-bottom:2px solid var(--o); margin-bottom:20px; }
+.vm-head h1 { margin:0; font-size:24px; font-weight:700; letter-spacing:-.015em; }
+.vm-head p { margin:4px 0 0; font-size:13.5px; color:var(--mute); }
+.vm-head-stats { display:flex; margin:0; }
+.vm-head-stats div { padding:0 22px; border-left:1px solid var(--line); text-align:right; }
+.vm-head-stats div:first-child { border-left:0; }
+.vm-head-stats dd { margin:0; font-size:22px; font-weight:700; font-variant-numeric:tabular-nums; color:var(--o-dark); }
+.vm-head-stats dt { font-size:11px; color:var(--mute); text-transform:uppercase; letter-spacing:.06em; }
 
-.vm-stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:14px; margin-bottom:18px; }
-.vm-stat { background:#fff; border-radius:14px; padding:16px; text-align:center; border:1px solid var(--o-line); border-top:3px solid var(--o); }
-.vm-stat label { display:block; font-size:12.5px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:#3a2312; }
-.vm-stat b { display:block; font-size:34px; margin:6px 0 2px; color:#1f1208; }
-.vm-stat small { font-size:11.5px; color:#7a6150; }
-.vm-link { background:none; border:0; padding:0; font:inherit; font-size:12.5px; color:var(--o-dark); text-decoration:underline; cursor:pointer; }
+.vm-tabs { display:flex; gap:4px; flex-wrap:wrap; margin-bottom:18px; border-bottom:1px solid var(--line); }
+.vm-tab { cursor:pointer; font:inherit; text-align:left; background:none; border:0; border-bottom:3px solid transparent; margin-bottom:-1px;
+  padding:10px 16px 9px; min-width:150px; display:flex; flex-direction:column; gap:3px; color:var(--mute); }
+.vm-tab:hover { background:var(--soft); }
+.vm-tab-name { font-size:13px; font-weight:700; color:var(--ink); text-transform:uppercase; letter-spacing:.02em; }
+.vm-tab-meta { font-size:12px; font-variant-numeric:tabular-nums; }
+.vm-bar { display:block; height:3px; background:var(--line); margin-top:4px; }
+.vm-bar i { display:block; height:100%; background:var(--o); }
+.vm-tab.on { border-bottom-color:var(--o); background:var(--soft); }
+.vm-tab.on .vm-tab-meta { color:var(--o-dark); }
+.vm-new { min-width:0; flex-direction:row; align-items:center; color:var(--o-dark); font-weight:600; font-size:13px; padding:0 14px; }
 
-.vm-toolbar { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:14px; }
-.vm-search { flex:0 1 320px; min-width:200px; padding:11px 14px; border-radius:12px; border:1px solid var(--o-line); background:#fff; font:inherit; }
+.vm-stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); background:var(--paper); border:1px solid var(--line); border-radius:6px; margin-bottom:18px; }
+.vm-stats > div { padding:14px 18px; border-left:1px solid var(--line); }
+.vm-stats > div:first-child { border-left:0; }
+.vm-stats label { display:block; font-size:11px; font-weight:600; letter-spacing:.07em; text-transform:uppercase; color:var(--mute); }
+.vm-stats b { display:block; font-size:30px; font-weight:700; line-height:1.15; margin:3px 0 2px; font-variant-numeric:tabular-nums; }
+.vm-stats small { font-size:12px; color:var(--mute); }
+.vm-link { background:none; border:0; padding:0; font:inherit; font-size:12px; color:var(--o-dark); text-decoration:underline; cursor:pointer; }
+
+.vm-toolbar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:12px; }
+.vm-search { flex:0 1 300px; min-width:200px; padding:8px 12px; border-radius:6px; border:1px solid var(--line); background:var(--paper); font:inherit; font-size:13.5px; }
 .vm-search:focus, .vm-table input:focus, .vm-table select:focus { outline:2px solid var(--o); outline-offset:-1px; }
-.vm-check { display:flex; gap:6px; align-items:center; font-weight:700; font-size:13.5px; cursor:pointer; }
+.vm-check { display:flex; gap:6px; align-items:center; font-size:13px; cursor:pointer; color:var(--ink); }
 .vm-check input { accent-color:var(--o); }
 .vm-spacer { flex:1; }
-.vm-btn { cursor:pointer; padding:10px 16px; border-radius:10px; font:inherit; font-weight:700; font-size:13.5px; background:#fff; color:var(--o-dark); border:1px solid var(--o-line); }
-.vm-btn:hover:not(:disabled) { border-color:var(--o); background:var(--o-bg); }
-.vm-btn:disabled { opacity:.45; cursor:default; }
-.vm-btn.danger { color:#b42318; border-color:#f3b8b2; }
+.vm-btn { cursor:pointer; padding:8px 14px; border-radius:6px; font:inherit; font-weight:600; font-size:13px; background:var(--paper); color:var(--ink); border:1px solid var(--line); }
+.vm-btn:hover:not(:disabled) { border-color:var(--o); color:var(--o-dark); }
+.vm-btn:disabled { opacity:.4; cursor:default; }
+.vm-btn.danger { color:#a3281d; }
+.vm-btn.danger:hover:not(:disabled) { border-color:#a3281d; color:#a3281d; }
 .vm-btn.solid { background:var(--o); color:#fff; border-color:var(--o); }
-.vm-save { font-size:12.5px; font-weight:700; color:#6b4a30; }
-.vm-save.saved { color:#2f7d32; } .vm-save.error { color:#b42318; }
+.vm-btn.solid:hover { background:var(--o-dark); color:#fff; }
+.vm-save { font-size:12px; color:var(--mute); min-width:150px; text-align:right; }
+.vm-save.saved { color:#2f7d32; } .vm-save.error { color:#a3281d; font-weight:600; }
 
-.vm-table-wrap { overflow-x:auto; border-radius:14px; border:1px solid var(--o-line); background:#fff; }
-.vm-table { width:100%; min-width:1100px; border-collapse:collapse; font-size:13px; }
-.vm-table thead th { background:var(--o-dark); color:#fff; padding:14px 10px; font-size:11.5px; letter-spacing:.05em; text-transform:uppercase; text-align:center; position:static; }
-.vm-table td { padding:8px 8px; border-bottom:1px solid #fbe6d2; vertical-align:middle; }
-.vm-table tbody tr:nth-child(even) { background:var(--o-bg); }
-.vm-table input, .vm-table select { width:100%; padding:9px 10px; border:1px solid var(--o-line); border-radius:10px; background:#fff; font:inherit; font-size:13px; min-width:0; }
-.vm-date { position:relative; display:flex; align-items:center; justify-content:space-between; gap:6px; padding:9px 10px; border:1px solid var(--o-line); border-radius:10px; background:#fff; font-size:13px; cursor:pointer; white-space:nowrap; }
-.vm-date:hover { border-color:var(--o); }
-.vm-date .ph { color:#9b8574; }
-.vm-date .cal { font-size:12px; }
+.vm-table-wrap { overflow:auto; max-height:calc(100vh - 150px); border:1px solid var(--line); border-radius:6px; background:var(--paper); }
+.vm-table { width:100%; min-width:1080px; border-collapse:separate; border-spacing:0; font-size:13px; }
+.vm-table thead th { position:sticky; top:0; z-index:2; background:#f3ebe1; color:var(--ink); padding:10px 10px; font-size:11px; font-weight:700;
+  letter-spacing:.06em; text-transform:uppercase; text-align:left; border-bottom:2px solid var(--o); white-space:nowrap; }
+.vm-table td { padding:3px 6px; border-bottom:1px solid #f0e9e0; vertical-align:middle; }
+.vm-table tbody tr:hover td { background:#fffaf4; }
+.vm-table input, .vm-table select { width:100%; height:32px; padding:0 8px; border:1px solid transparent; border-radius:4px; background:transparent; font:inherit; font-size:13px; min-width:0; color:var(--ink); }
+.vm-table input:hover, .vm-table select:hover, .vm-date:hover { border-color:var(--line); background:#fff; }
+.vm-table input::placeholder { color:#b3a595; }
+.vm-date { position:relative; display:flex; align-items:center; justify-content:space-between; gap:6px; height:32px; padding:0 8px; border:1px solid transparent; border-radius:4px; font-size:13px; cursor:pointer; white-space:nowrap; min-width:150px; }
+.vm-date .ph { color:#b3a595; }
+.vm-date .cal { color:#a89684; flex-shrink:0; }
 .vm-date input { position:absolute; inset:0; width:100%; height:100%; opacity:0; pointer-events:none; }
-.vm-series { text-align:center; font-weight:800; color:#9b7b62; font-family:var(--mono); }
-.vm-pill { display:inline-block; padding:6px 12px; border-radius:99px; font-size:10.5px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; background:#ffe9d2; color:var(--o-deep); }
-.vm-pill.out { background:var(--o); color:#fff; } .vm-pill.availed { background:#1f2937; color:#fff; }
-.vm-pager { display:flex; justify-content:center; align-items:center; gap:14px; margin:16px 0 4px; font-size:13px; color:#6b4a30; }
-.vm-empty { text-align:center; padding:28px; color:#8a6b55; }
-@media (max-width:700px) { .vm-hero { padding:16px; } .vm-hero-text h1 { font-size:21px; } .vm-tab { flex:1 1 100%; } }
+.vm-series { font-family:var(--mono); font-weight:600; color:var(--mute); padding-left:10px !important; }
+.vm-status { display:inline-flex; align-items:center; gap:7px; font-size:12px; font-weight:600; color:var(--mute); white-space:nowrap; }
+.vm-status::before { content:''; width:8px; height:8px; border-radius:50%; background:#cdbfb1; }
+.vm-status.out { color:var(--o-dark); } .vm-status.out::before { background:var(--o); }
+.vm-status.availed { color:#2f7d32; } .vm-status.availed::before { background:#2f7d32; }
+.vm-pager { display:flex; justify-content:center; align-items:center; gap:14px; margin:14px 0 4px; font-size:13px; color:var(--mute); }
+.vm-empty { text-align:center; padding:28px; color:var(--mute); }
+@media (max-width:700px) { .vm-head-stats div { padding:0 12px; } .vm-tab { flex:1 1 40%; } }
 `;
 
 export default function Page() {
