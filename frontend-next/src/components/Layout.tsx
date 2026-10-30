@@ -143,8 +143,8 @@ export default function Layout({ children, sidebarStatus }: { children: ReactNod
         })}
 
         <div className="sidebar-user bottom">
-          <span className="user-avatar" style={{ background: 'rgba(255,255,255,0.2)' }}>
-            {(username || '?').charAt(0).toUpperCase()}
+          <span className="user-avatar" aria-hidden="true">
+            <IconUser size={17} />
           </span>
           <span className="user-text">
             <strong>{username}{sidebarStatus}</strong>
