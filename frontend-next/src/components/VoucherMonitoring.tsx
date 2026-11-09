@@ -112,6 +112,7 @@ export default function VoucherMonitoring() {
   const active = rows.find((v) => v.id === activeId) || null;
   const totalOut = rows.reduce((s, v) => s + v.given_out, 0);
   const totalLeft = rows.reduce((s, v) => s + (v.beginning - v.given_out), 0);
+  const totalAvailed = rows.reduce((s, v) => s + v.availed, 0);
 
   const pad = Math.max(3, String(beginning).length);
   const series = useMemo(() => {
@@ -203,6 +204,7 @@ export default function VoucherMonitoring() {
             <div className="vm-kpi"><span className="vm-kpi-ico"><TicketIcon small /></span><div><b>{rows.length}</b><small>Vouchers</small></div></div>
             <div className="vm-kpi"><span className="vm-kpi-ico out"><ArrowIcon /></span><div><b>{totalOut.toLocaleString()}</b><small>Given out</small></div></div>
             <div className="vm-kpi"><span className="vm-kpi-ico stock"><BoxIcon /></span><div><b>{totalLeft.toLocaleString()}</b><small>In stock</small></div></div>
+            <div className="vm-kpi"><span className="vm-kpi-ico done"><CheckIcon /></span><div><b>{totalAvailed.toLocaleString()}</b><small>Availed</small></div></div>
           </div>
         </header>
 
@@ -220,6 +222,7 @@ export default function VoucherMonitoring() {
                   {low && <span className="vm-chip warn">Low</span>}
                 </span>
                 <span className="vm-card-nums"><b>{v.given_out.toLocaleString()}</b><small>/ {v.beginning.toLocaleString()} out</small></span>
+                <span className="vm-card-availed"><i />{v.availed.toLocaleString()} availed</span>
                 <span className="vm-bar"><i style={{ width: pct + '%' }} /></span>
               </button>
             );
@@ -410,6 +413,7 @@ function TicketIcon({ small }: { small?: boolean }) {
   );
 }
 const stroke = { fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, 'aria-hidden': true };
+const CheckIcon = () => <svg width="18" height="18" viewBox="0 0 24 24" {...stroke}><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>;
 const ArrowIcon = () => <svg width="18" height="18" viewBox="0 0 24 24" {...stroke}><path d="M5 12h14M13 6l6 6-6 6" /></svg>;
 const BoxIcon = () => <svg width="18" height="18" viewBox="0 0 24 24" {...stroke}><path d="M21 8 12 3 3 8v8l9 5 9-5V8Z" /><path d="m3 8 9 5 9-5M12 13v8" /></svg>;
 const SearchIcon = () => <svg className="vm-search-ico" width="16" height="16" viewBox="0 0 24 24" {...stroke}><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>;
@@ -434,7 +438,8 @@ const VM_CSS = `
 .vm-kpi small { font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--mute); }
 .vm-kpi-ico { width:36px; height:36px; border-radius:10px; display:grid; place-items:center; background:var(--a-soft); color:var(--a); }
 .vm-kpi-ico.out { background:var(--warn-soft); color:var(--warn); }
-.vm-kpi-ico.stock { background:var(--green-soft); color:var(--green); }
+.vm-kpi-ico.stock { background:var(--a-soft); color:var(--a); }
+.vm-kpi-ico.done { background:var(--green-soft); color:var(--green); }
 
 /* picker */
 .vm-picker { display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:10px; margin-bottom:22px; }
@@ -447,6 +452,8 @@ const VM_CSS = `
 .vm-card-nums { display:flex; align-items:baseline; gap:5px; }
 .vm-card-nums b { font-size:20px; font-weight:750; font-variant-numeric:tabular-nums; }
 .vm-card-nums small { font-size:12px; color:var(--mute); }
+.vm-card-availed { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--green); font-weight:600; font-variant-numeric:tabular-nums; }
+.vm-card-availed i { width:6px; height:6px; border-radius:50%; background:var(--green); }
 .vm-bar { display:block; height:5px; border-radius:99px; background:#efe8de; overflow:hidden; }
 .vm-bar i { display:block; height:100%; border-radius:99px; background:var(--a); transition:width .3s; }
 .vm-chip { font-size:10px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; padding:2px 7px; border-radius:99px; }
