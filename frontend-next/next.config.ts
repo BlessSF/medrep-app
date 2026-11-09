@@ -1,7 +1,14 @@
-import type { NextConfig } from "next";
+// Merge this into your existing next.config (keep any options you already have).
+const BACKEND = (process.env.BACKEND_URL || 'http://localhost/medrep-api').replace(/\/$/, '');
 
-const nextConfig: NextConfig = {
-  /* config options here */
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  async rewrites() {
+    return [
+      // Browser calls /backend-api/auth/me.php  ->  <BACKEND_URL>/api/auth/me.php
+      { source: '/backend-api/:path*', destination: `${BACKEND}/api/:path*` },
+    ];
+  },
 };
 
-export default nextConfig;
+module.exports = nextConfig;

@@ -1,4 +1,9 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost/medrep-api/api';
+// All calls go to /backend-api on the SAME origin as the site. next.config
+// rewrites that path to the PHP server (see BACKEND_URL). Because the browser
+// only ever talks to its own origin, the session cookie is first-party, which
+// is what Safari (Mac + iPhone) requires. Cross-site cookies are blocked there.
+// Leave NEXT_PUBLIC_API_BASE unset in production.
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || '/backend-api';
 
 export class ApiError extends Error {
   status: number;
@@ -30,6 +35,9 @@ async function request<T = any>(path: string, options: RequestInit = {}): Promis
 
   const res = await fetch(`${API_BASE}${path}`, {
     credentials: 'include',
+    // Safari caches GET responses that have no cache headers, which shows
+    // stale or empty data. Always ask the server.
+    cache: 'no-store',
     headers,
     ...options,
   });
@@ -38,7 +46,14 @@ async function request<T = any>(path: string, options: RequestInit = {}): Promis
   try {
     body = await res.json();
   } catch {
-    // non-JSON response (e.g. file download) — caller should use rawUrl() instead
+    // Not JSON. A working endpoint always returns JSON, so this means the
+    // request never reached the PHP API (wrong URL, host error page, etc.).
+    throw new ApiError(
+      res.ok
+        ? 'The server sent an unexpected response. Check that the backend URL is correct and the PHP server is running.'
+        : `Request failed (${res.status}). Could not reach the backend.`,
+      res.status,
+    );
   }
 
   if (!res.ok || (body && body.success === false)) {
