@@ -45,7 +45,10 @@ const ADMIN_LINKS = [
   { to: '/admin/branches',   label: 'Branches',      icon: '⌂' },
 ];
 
-const CASHIER_LINKS = [{ to: '/staff', label: 'Daily Transaction', icon: '◧' }];
+const CASHIER_LINKS = [
+  { to: '/staff',          label: 'Daily Transaction', icon: '◧' },
+  { to: '/staff/vouchers', label: 'Vouchers',          icon: '◈' },
+];
 
 export default function Layout({ children, sidebarStatus }: { children: ReactNode; sidebarStatus?: ReactNode }) {
   const { username, role, branch, logout } = useAuth();
@@ -134,7 +137,7 @@ export default function Layout({ children, sidebarStatus }: { children: ReactNod
         </div>
 
         {links.map((l) => {
-          const isActive = l.to === '/admin' ? pathname === '/admin' : pathname.startsWith(l.to);
+          const isActive = l.to === '/admin' || l.to === '/staff' ? pathname === l.to : pathname.startsWith(l.to);
           return (
             <Link key={l.to} href={l.to} className={'nav-link' + (isActive ? ' active' : '')}>
               <span className="nav-icon">{l.icon}</span> {l.label}

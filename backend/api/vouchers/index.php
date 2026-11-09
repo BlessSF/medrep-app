@@ -2,11 +2,12 @@
 // GET  /api/vouchers/index.php            -> all vouchers for this branch + counts
 // GET  /api/vouchers/index.php?id=7       -> one voucher + its saved rows
 // POST /api/vouchers/index.php {action: create|rename|set_beginning|save_item|delete, ...}
-// Admin only. Everything is scoped to the logged-in branch.
+// Admin and cashier can read and record rows (save_item); creating, renaming,
+// resizing and deleting vouchers is admin only. Scoped to the logged-in branch.
 require_once __DIR__ . '/../../includes/api_helpers.php';
 $username = require_login();
 $branch = current_branch();
-require_role($conn, $username, ['admin']);
+$role = require_role($conn, $username, ['admin', 'cashier']);
 
 $conn->query("CREATE TABLE IF NOT EXISTS vouchers (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -90,6 +91,9 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') json_error('Method not allowed.', 405
 
 $data = json_input();
 $action = $data['action'] ?? '';
+if ($action !== 'save_item' && $role !== 'admin') {
+    json_error('Forbidden: only an admin can do that.', 403);
+}
 
 if ($action === 'create') {
     $name = trim($data['name'] ?? '');
