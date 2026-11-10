@@ -39,7 +39,7 @@ export default function VoucherMonitoring() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [q, setQ] = useState('');
-  const [onlyGiven, setOnlyGiven] = useState(false);
+  const [filter, setFilter] = useState<'all' | 'given' | 'availed'>('all');
   const [page, setPage] = useState(0);
   const [save, setSave] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [msg, setMsg] = useState<{ text: string; kind: 'success' | 'error' } | null>(null);
@@ -74,7 +74,7 @@ export default function VoucherMonitoring() {
     setItems(map);
     setActiveId(id);
     setBeginning(r.voucher.beginning);
-    setPage(0); setQ(''); setOnlyGiven(false);
+    setPage(0); setQ(''); setFilter('all');
     if (refreshList) { const l = await api.get('/vouchers/index.php'); setVouchers(l.vouchers); }
   }
 
@@ -127,7 +127,8 @@ export default function VoucherMonitoring() {
     const out: number[] = [];
     for (let n = 1; n <= beginning; n++) {
       const it = items[n];
-      if (onlyGiven && !isGivenOut(it)) continue;
+      if (filter === 'given' && !isGivenOut(it)) continue;
+      if (filter === 'availed' && !it?.date_availed) continue;
       if (needle) {
         const hay = [String(n), String(n).padStart(pad, '0'), it?.customer_name, it?.redeemed_by, it?.payment_mode, it?.remarks, it?.note, it?.date_given, it?.date_availed]
           .filter(Boolean).join(' ').toLowerCase();
@@ -136,7 +137,7 @@ export default function VoucherMonitoring() {
       out.push(n);
     }
     return out;
-  }, [items, beginning, q, onlyGiven, pad]);
+  }, [items, beginning, q, filter, pad]);
 
   const pages = Math.max(1, Math.ceil(series.length / PAGE_SIZE));
   const safePage = Math.min(page, pages - 1);
@@ -306,8 +307,9 @@ export default function VoucherMonitoring() {
                 {q && <button className="vm-clear" aria-label="Clear search" onClick={() => { setQ(''); setPage(0); }}>✕</button>}
               </div>
               <div className="vm-seg" role="group" aria-label="Filter rows">
-                <button className={!onlyGiven ? 'on' : ''} onClick={() => { setOnlyGiven(false); setPage(0); }}>All</button>
-                <button className={onlyGiven ? 'on' : ''} onClick={() => { setOnlyGiven(true); setPage(0); }}>Given out</button>
+                <button className={filter === 'all' ? 'on' : ''} onClick={() => { setFilter('all'); setPage(0); }}>All</button>
+                <button className={filter === 'given' ? 'on' : ''} onClick={() => { setFilter('given'); setPage(0); }}>Given out <em>{liveOut}</em></button>
+                <button className={filter === 'availed' ? 'on' : ''} onClick={() => { setFilter('availed'); setPage(0); }}>Availed <em>{liveAvailed}</em></button>
               </div>
               <span className="vm-count">{series.length.toLocaleString()} {series.length === 1 ? 'row' : 'rows'}</span>
             </div>
@@ -525,6 +527,8 @@ const VM_CSS = `
 .vm-search:focus, .vm-table input:focus, .vm-table select:focus { outline:2px solid var(--a); outline-offset:-1px; background:#fff; }
 .vm-seg { display:inline-flex; padding:3px; background:#f1ebe2; border-radius:10px; }
 .vm-seg button { border:0; background:none; font:inherit; font-size:13px; font-weight:600; padding:6px 14px; border-radius:7px; cursor:pointer; color:var(--mute); }
+.vm-seg button em { font-style:normal; font-size:11.5px; margin-left:4px; padding:1px 6px; border-radius:99px; background:rgba(36,28,21,.08); color:var(--mute); font-variant-numeric:tabular-nums; }
+.vm-seg button.on em { background:var(--a-soft); color:var(--a); }
 .vm-seg button.on { background:var(--card); color:var(--ink); box-shadow:0 1px 3px rgba(36,28,21,.12); }
 .vm-count { margin-left:auto; font-size:12.5px; color:var(--mute); font-variant-numeric:tabular-nums; }
 
