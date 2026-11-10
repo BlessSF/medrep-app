@@ -37,6 +37,7 @@ export default function VoucherMonitoring() {
   const [items, setItems] = useState<Record<number, Item>>({});
   const itemsRef = useRef<Record<number, Item>>({});
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [q, setQ] = useState('');
   const [onlyGiven, setOnlyGiven] = useState(false);
   const [page, setPage] = useState(0);
@@ -77,8 +78,14 @@ export default function VoucherMonitoring() {
     if (refreshList) { const l = await api.get('/vouchers/index.php'); setVouchers(l.vouchers); }
   }
 
+  function reload() {
+    setLoading(true);
+    setLoadError('');
+    loadList().catch((e) => { setLoading(false); setLoadError(errText(e, 'Could not load vouchers.')); });
+  }
+
   useEffect(() => {
-    loadList().catch((e) => { setLoading(false); flash(errText(e, 'Could not load vouchers.'), 'error'); });
+    reload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -236,7 +243,14 @@ export default function VoucherMonitoring() {
         </div>
 
         {loading && <div className="vm-empty">Loading vouchers…</div>}
-        {!loading && !active && (
+        {!loading && loadError && (
+          <div className="vm-blank err">
+            <h3>Couldn’t load vouchers</h3>
+            <p>{loadError}</p>
+            <button className="vm-btn solid" onClick={reload}>Try again</button>
+          </div>
+        )}
+        {!loading && !loadError && !active && (
           <div className="vm-blank">
             <TicketIcon />
             <h3>No vouchers yet</h3>
@@ -465,6 +479,7 @@ const VM_CSS = `
 /* empty states */
 .vm-empty { text-align:center; padding:30px; color:var(--mute); }
 .vm-blank { display:flex; flex-direction:column; align-items:center; gap:6px; text-align:center; padding:56px 20px; background:var(--card); border:1px dashed var(--line); border-radius:14px; color:var(--a); }
+.vm-blank.err { color:var(--red); }
 .vm-blank h3 { color:var(--ink); font-size:17px; margin-top:6px; }
 .vm-blank p { margin:0 0 12px; color:var(--mute); font-size:13.5px; }
 
