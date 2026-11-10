@@ -41,11 +41,13 @@ export default function Login() {
   const [busy, setBusy] = useState(false);
   const [imgSrc, setImgSrc] = useState(DEFAULT_IMAGE);
   const [branchColor, setBranchColor] = useState('#1b4332');
+  const [branchError, setBranchError] = useState('');
   const [branchSettings, setBranchSettings] = useState<Record<string, BranchSettings>>({});
 
-  useEffect(() => {
+  function loadBranches() {
     const s = loadBranchSettings();
     setBranchSettings(s);
+    setBranchError('');
     api.get('/branches/list.php').then((r) => {
       setBranches(r.branches);
       if (r.branches.length > 0) {
@@ -54,8 +56,12 @@ export default function Login() {
         setImgSrc(getBranchImage(first, s));
         setBranchColor(getBranchColor(first, s));
       }
-    }).catch(() => {});
-  }, []);
+    }).catch((e) => {
+      setBranchError(e instanceof ApiError ? e.message : 'Could not reach the server.');
+    });
+  }
+
+  useEffect(() => { loadBranches(); }, []);
 
   function handleBranchChange(e: React.ChangeEvent<HTMLSelectElement>) {
     const selected = e.target.value;
@@ -135,12 +141,19 @@ export default function Login() {
                 <select value={branch} onChange={handleBranchChange} required className="lfield-select"
                   style={{ '--focus-color': branchColor } as any}
                 >
-                  {branches.length === 0 && <option value="">Loading branches…</option>}
+                  {branches.length === 0 && <option value="">{branchError ? 'Could not load branches' : 'Loading branches…'}</option>}
                   {branches.map((b) => <option key={b} value={b}>{b}</option>)}
                 </select>
                 <svg className="lfield-select-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
               </div>
             </div>
+
+            {branchError && (
+              <div className="login-error-banner">
+                {branchError}{' '}
+                <button type="button" onClick={loadBranches} style={{ background: 'none', border: 0, padding: 0, color: 'inherit', textDecoration: 'underline', cursor: 'pointer', font: 'inherit' }}>Try again</button>
+              </div>
+            )}
 
             <div className="lfield">
               <label className="lfield-label">Username</label>

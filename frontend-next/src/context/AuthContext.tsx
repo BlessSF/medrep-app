@@ -10,6 +10,8 @@ interface AuthState {
   role: Role;
   branch: string | null;
   loading: boolean;
+  serverError: string;
+  retry: () => void;
   login: (branch: string, username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -21,8 +23,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<Role>('');
   const [branch, setBranch] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [serverError, setServerError] = useState('');
 
-  useEffect(() => {
+  const check = useCallback(() => {
+    setLoading(true);
+    setServerError('');
     api
       .get('/auth/me.php')
       .then((r) => {
@@ -30,11 +35,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setRole(r.role);
         setBranch(r.branch || null);
       })
-      .catch(() => {
-        setUsername(null);
+      .catch((e) => {
+        // Only a 401 means "not logged in". Anything else (429, server down,
+        // no network) says nothing about the session, so don't log the person
+        // out: show a retry message instead of bouncing them to the login page.
+        if (e instanceof ApiError && e.status === 401) {
+          setUsername(null);
+        } else {
+          setServerError(e instanceof ApiError ? e.message : 'Could not reach the server.');
+        }
       })
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => { check(); }, [check]);
 
   const login = useCallback(async (branchName: string, u: string, p: string) => {
     const r = await api.post('/auth/login.php', { branch: branchName, username: u, password: p });
@@ -55,7 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ username, role, branch, loading, login, logout }}>
+    <AuthContext.Provider value={{ username, role, branch, loading, serverError, retry: check, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
