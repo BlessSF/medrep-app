@@ -5,6 +5,19 @@
 // Leave NEXT_PUBLIC_API_BASE unset in production.
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || '/backend-api';
 
+// Safari and Brave do not keep cookies set by another site, so after login the
+// server hands back a session token which we keep here and send on every call.
+const TOKEN_KEY = 'medrep_sid';
+function getToken(): string {
+  try { return localStorage.getItem(TOKEN_KEY) || ''; } catch { return ''; }
+}
+function setToken(t: string) {
+  try { localStorage.setItem(TOKEN_KEY, t); } catch { /* storage blocked: cookie still works where allowed */ }
+}
+function clearToken() {
+  try { localStorage.removeItem(TOKEN_KEY); } catch { /* ignore */ }
+}
+
 export class ApiError extends Error {
   status: number;
   constructor(message: string, status: number) {
@@ -32,6 +45,9 @@ async function request<T = any>(path: string, options: RequestInit = {}): Promis
   if (options.body !== undefined && !('Content-Type' in headers)) {
     headers['Content-Type'] = 'text/plain;charset=UTF-8';
   }
+
+  const token = getToken();
+  if (token) headers['X-Session-Id'] = token;
 
   const res = await fetch(`${API_BASE}${path}`, {
     credentials: 'include',
@@ -69,7 +85,12 @@ export const api = {
   post: <T = any>(path: string, data?: any) =>
     request<T>(path, { method: 'POST', body: data ? JSON.stringify(data) : undefined }),
   // Builds a plain URL for endpoints that return a file (CSV/XLSX) or need a native <a href>.
-  rawUrl: (path: string) => `${API_BASE}${path}`,
+  rawUrl: (path: string) => {
+    const token = getToken();
+    return `${API_BASE}${path}` + (token ? `${path.includes('?') ? '&' : '?'}sid=${encodeURIComponent(token)}` : '');
+  },
+  setToken,
+  clearToken,
 };
 
 export default api;

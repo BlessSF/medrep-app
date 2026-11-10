@@ -29,8 +29,9 @@ if (!in_array($role, ['admin', 'cashier'], true)) {
     json_error('Invalid role assigned to the user.', 403);
 }
 
+session_regenerate_id(true);
 $_SESSION['username'] = $user['username'];
 $_SESSION['role'] = $role;
 $_SESSION['branch'] = $user['branch'];
 
-json_success(['username' => $user['username'], 'role' => $role, 'branch' => $user['branch']]);
+json_success(['username' => $user['username'], 'role' => $role, 'branch' => $user['branch'], 'token' => session_id()]);

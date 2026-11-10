@@ -40,6 +40,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // no network) says nothing about the session, so don't log the person
         // out: show a retry message instead of bouncing them to the login page.
         if (e instanceof ApiError && e.status === 401) {
+          api.clearToken();
           setUsername(null);
         } else {
           setServerError(e instanceof ApiError ? e.message : 'Could not reach the server.');
@@ -52,6 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (branchName: string, u: string, p: string) => {
     const r = await api.post('/auth/login.php', { branch: branchName, username: u, password: p });
+    if (r.token) api.setToken(r.token);
     setUsername(r.username);
     setRole(r.role);
     setBranch(r.branch || branchName);
@@ -63,6 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       if (!(e instanceof ApiError)) throw e;
     }
+    api.clearToken();
     setUsername(null);
     setRole('');
     setBranch(null);

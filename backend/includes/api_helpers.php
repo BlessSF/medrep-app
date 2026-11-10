@@ -27,8 +27,10 @@ if (in_array($origin, $allowed_origins, true)) {
 }
 header('Access-Control-Allow-Credentials: true');
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, X-Requested-With');
+header('Access-Control-Allow-Headers: Content-Type, X-Requested-With, X-Session-Id');
 header('Content-Type: application/json; charset=utf-8');
+header('Cache-Control: no-store, no-cache, must-revalidate');
+header('Pragma: no-cache');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(204);
@@ -47,13 +49,29 @@ $session_lifetime = 60 * 60 * 24 * 30; // 30 days
 // cookie, so without this a "persistent" login would still silently die
 // after sitting idle for less than half an hour.
 ini_set('session.gc_maxlifetime', (string)$session_lifetime);
+$is_https = (($_SERVER['HTTPS'] ?? '') !== '' && ($_SERVER['HTTPS'] ?? '') !== 'off')
+    || ($_SERVER['SERVER_PORT'] ?? '') == 443
+    || strtolower($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https';
+// Over HTTPS the site (Vercel) and this API are different sites, so the cookie
+// must be SameSite=None;Secure for browsers that allow cross-site cookies
+// (Chrome, Edge, Android). Plain http (local XAMPP) keeps Lax.
 session_set_cookie_params([
     'lifetime' => $session_lifetime,
     'path' => '/',
-    'samesite' => 'Lax',
-    'secure' => (($_SERVER['HTTPS'] ?? '') !== '' || ($_SERVER['SERVER_PORT'] ?? '') == 443),
+    'samesite' => $is_https ? 'None' : 'Lax',
+    'secure' => $is_https,
     'httponly' => true,
 ]);
+
+// Safari and Brave drop cross-site cookies, so the front end also sends the
+// session id in an X-Session-Id header (or ?sid= for download links). When it
+// is present we resume that session instead of relying on the cookie.
+// use_strict_mode makes PHP ignore ids it has never issued.
+ini_set('session.use_strict_mode', '1');
+$incoming_sid = $_SERVER['HTTP_X_SESSION_ID'] ?? ($_GET['sid'] ?? '');
+if (is_string($incoming_sid) && preg_match('/^[A-Za-z0-9,-]{16,128}$/', $incoming_sid)) {
+    session_id($incoming_sid);
+}
 session_start();
 
 require_once __DIR__ . '/db_config.php';
