@@ -33,25 +33,14 @@ async function request<T = any>(path: string, options: RequestInit = {}): Promis
     headers['Content-Type'] = 'text/plain;charset=UTF-8';
   }
 
-  // The host sometimes answers 429 (too many requests) when several calls
-  // arrive at once. That response is sent before the PHP code runs, so it is
-  // safe to wait and try again a couple of times before giving up.
-  const method = (options.method || 'GET').toUpperCase();
-  let res: Response;
-  for (let attempt = 0; ; attempt++) {
-    res = await fetch(`${API_BASE}${path}`, {
-      credentials: 'include',
-      // Safari caches GET responses that have no cache headers, which shows
-      // stale or empty data. Always ask the server.
-      cache: 'no-store',
-      headers,
-      ...options,
-    });
-    const retryable = res.status === 429 || (res.status === 503 && method === 'GET');
-    if (!retryable || attempt >= 3) break;
-    const wait = Number(res.headers.get('Retry-After'));
-    await new Promise((r) => setTimeout(r, (wait > 0 && wait <= 10 ? wait * 1000 : 600 * 2 ** attempt) + Math.random() * 250));
-  }
+  const res = await fetch(`${API_BASE}${path}`, {
+    credentials: 'include',
+    // Safari caches GET responses that have no cache headers, which shows
+    // stale or empty data. Always ask the server.
+    cache: 'no-store',
+    headers,
+    ...options,
+  });
 
   let body: any = null;
   try {
@@ -63,7 +52,7 @@ async function request<T = any>(path: string, options: RequestInit = {}): Promis
       res.ok
         ? 'The server sent an unexpected response. Check that the backend URL is correct and the PHP server is running.'
         : res.status === 429
-          ? 'The server is busy (too many requests). Please wait a few seconds and try again.'
+          ? 'The server is limiting requests from this network (429). Wait a few minutes without refreshing, then try again.'
           : `Request failed (${res.status}). Could not reach the backend.`,
       res.status,
     );
