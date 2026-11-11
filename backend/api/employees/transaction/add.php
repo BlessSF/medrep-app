@@ -40,6 +40,8 @@ if ($type === 'transfer') {
     $insertReceiver->bind_param('ssdssss', $transfer_name, $transfer_company, $amount, $name, $transfer_remarks, $cashier_name, $branch);
 
     if ($insertSender->execute() && $insertReceiver->execute()) {
+        log_action($conn, $cashier_name, 'Added transaction',
+            "Transfer of " . number_format($amount, 2) . " from $name to $transfer_name" . ($remarks !== '' ? " ($remarks)" : ''), $branch);
         json_success(['message' => '✅ Transfer successful!']);
     }
     json_error('Error processing transfer: ' . $conn->error, 500);
@@ -85,5 +87,9 @@ if (!$stmt->execute()) {
     json_error('Error inserting record: ' . $stmt->error, 500);
 }
 $stmt->close();
+
+$pay = $payment_method !== '' && $payment_method !== 'na' ? ", paid by $payment_method" . ($card !== '' ? " ($card)" : '') : '';
+log_action($conn, $cashier_name, 'Added transaction',
+    ucfirst($type) . " of " . number_format($amount, 2) . " for $name" . ($company !== '' ? " ($company)" : '') . $pay . ($remarks !== '' ? " — $remarks" : ''), $branch);
 
 json_success(['message' => '✅ ' . ucfirst($type) . ' of ' . number_format($amount, 2) . ' added for ' . $name . '.']);

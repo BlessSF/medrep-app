@@ -33,6 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         json_error('Could not add medrep: ' . $insert->error);
     }
     $insert->close();
+    log_action($conn, $username, 'Registered medrep', "Added medrep $new_name to $new_company", $branch);
     json_success(['message' => "\"$new_name\" added to $new_company."]);
 }
 

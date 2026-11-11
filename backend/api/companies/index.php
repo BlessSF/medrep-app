@@ -2,7 +2,7 @@
 // GET  /api/companies/index.php               -> list companies + record counts
 // POST /api/companies/index.php {action:add|rename|delete, ...}
 require_once __DIR__ . '/../../includes/api_helpers.php';
-require_login();
+$username = require_login();
 $branch = current_branch();
 ensure_companies_table($conn, $branch);
 
@@ -21,6 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             json_error($msg);
         }
         $stmt->close();
+        log_action($conn, $username, 'Added company', "Added company $name", $branch);
         json_success(['message' => "Company \"$name\" saved."]);
     }
 
@@ -47,16 +48,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $upd->execute();
         $upd->close();
 
+        log_action($conn, $username, 'Renamed company', "Renamed company $old_name to $new_name", $branch);
         json_success(['message' => "Renamed \"$old_name\" to \"$new_name\"."]);
     }
 
     if ($action === 'delete') {
         $id = (int)($data['id'] ?? 0);
         if ($id > 0) {
+            $nm = $conn->prepare('SELECT name FROM companies WHERE id = ? AND branch = ?');
+            $nm->bind_param('is', $id, $branch);
+            $nm->execute();
+            $gone = $nm->get_result()->fetch_assoc()['name'] ?? '';
+            $nm->close();
+
             $stmt = $conn->prepare('DELETE FROM companies WHERE id = ? AND branch = ?');
             $stmt->bind_param('is', $id, $branch);
             $stmt->execute();
+            $deleted = $stmt->affected_rows > 0;
             $stmt->close();
+            if ($deleted) log_action($conn, $username, 'Deleted company', "Deleted company $gone", $branch);
         }
         json_success(['message' => 'Company deleted.']);
     }

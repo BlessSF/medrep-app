@@ -41,7 +41,7 @@ const ADMIN_LINKS = [
   { to: '/admin/cashout',    label: 'Cashout Report',icon: '¥' },
   { to: '/admin/vouchers',   label: 'Vouchers',      icon: '◈' },
   { to: '/admin/users',      label: 'Users',         icon: <IconUser /> },
-  { to: '/admin/tracking',   label: 'Tracking',      icon: '◎' },
+  { to: '/admin/tracking',   label: 'Audit Log',     icon: '◎' },
   { to: '/admin/branches',   label: 'Branches',      icon: '⌂' },
 ];
 

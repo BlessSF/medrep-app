@@ -21,6 +21,7 @@ if ($result->num_rows !== 1) {
     
 $user = $result->fetch_assoc();
 if (!password_verify($password, $user['password'])) {
+    log_action($conn, $user['username'], 'Failed login', 'Wrong password entered', $user['branch']);
     json_error('Incorrect password.', 401);
 }
 
@@ -34,4 +35,5 @@ $_SESSION['username'] = $user['username'];
 $_SESSION['role'] = $role;
 $_SESSION['branch'] = $user['branch'];
 
+log_action($conn, $user['username'], 'Logged in', 'Signed in as ' . $role, $user['branch']);
 json_success(['username' => $user['username'], 'role' => $role, 'branch' => $user['branch'], 'token' => session_id()]);
