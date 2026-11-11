@@ -2,12 +2,20 @@
 // GET  /api/vouchers/index.php            -> all vouchers for this branch + counts
 // GET  /api/vouchers/index.php?id=7       -> one voucher + its saved rows
 // POST /api/vouchers/index.php {action: create|rename|set_beginning|save_item|delete, ...}
-// Admin and cashier can read and record rows (save_item); creating, renaming,
-// resizing and deleting vouchers is admin only. Scoped to the logged-in branch.
+// Admin and cashier can read and record rows (save_item). Creating, renaming,
+// resizing and deleting vouchers is for admins, plus cashiers of the branches
+// listed in CASHIER_VOUCHER_BRANCHES. Scoped to the logged-in branch.
 require_once __DIR__ . '/../../includes/api_helpers.php';
 $username = require_login();
 $branch = current_branch();
 $role = require_role($conn, $username, ['admin', 'cashier']);
+
+// Branches whose cashiers may also add, rename, resize and delete vouchers.
+// To let every cashier do it, replace this list with the word 'ALL'.
+const CASHIER_VOUCHER_BRANCHES = ['DOIS'];
+$can_manage = $role === 'admin'
+    || ($role === 'cashier' && (CASHIER_VOUCHER_BRANCHES === 'ALL'
+        || in_array(strtoupper($branch), array_map('strtoupper', (array)CASHIER_VOUCHER_BRANCHES), true)));
 
 $conn->query("CREATE TABLE IF NOT EXISTS vouchers (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -65,7 +73,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             $items[] = $r;
         }
         $stmt->close();
-        json_success(['voucher' => ['id' => $vid, 'name' => $v['name'], 'beginning' => (int)$v['beginning']], 'items' => $items]);
+        json_success(['voucher' => ['id' => $vid, 'name' => $v['name'], 'beginning' => (int)$v['beginning']], 'items' => $items, 'can_manage' => $can_manage]);
     }
 
     $stmt = $conn->prepare("SELECT v.id, v.name, v.beginning,
@@ -84,15 +92,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         ];
     }
     $stmt->close();
-    json_success(['vouchers' => $list]);
+    json_success(['vouchers' => $list, 'can_manage' => $can_manage]);
 }
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') json_error('Method not allowed.', 405);
 
 $data = json_input();
 $action = $data['action'] ?? '';
-if ($action !== 'save_item' && $role !== 'admin') {
-    json_error('Forbidden: only an admin can do that.', 403);
+if ($action !== 'save_item' && !$can_manage) {
+    json_error('Forbidden: you are not allowed to manage vouchers.', 403);
 }
 
 if ($action === 'create') {
@@ -126,6 +134,7 @@ if ($action === 'rename') {
         json_error($dup ? "\"$name\" already exists." : 'Could not rename.', $dup ? 400 : 500);
     }
     $stmt->close();
+    log_action($conn, $username, 'Voucher renamed', $v['name'] . ' -> ' . $name, $branch);
     json_success(['message' => 'Renamed.']);
 }
 
@@ -162,6 +171,13 @@ if ($action === 'save_item') {
     $remarks  = mb_substr(trim($data['remarks'] ?? ''), 0, 50);
     $note     = mb_substr(trim($data['note'] ?? ''), 0, 500);
 
+    // Remember what the row looked like so the audit log can say what changed.
+    $prev_stmt = $conn->prepare('SELECT date_given, customer_name, redeemed_by, payment_mode, remarks, date_availed, note FROM voucher_items WHERE voucher_id = ? AND series_no = ?');
+    $prev_stmt->bind_param('ii', $vid, $series);
+    $prev_stmt->execute();
+    $prev = $prev_stmt->get_result()->fetch_assoc();
+    $prev_stmt->close();
+
     $empty = $date_given === null && $date_availed === null
         && $customer === '' && $redeemed === '' && $payment === '' && $remarks === '' && $note === '';
 
@@ -179,6 +195,33 @@ if ($action === 'save_item') {
     }
     if (!$stmt->execute()) { $stmt->close(); json_error('Could not save.', 500); }
     $stmt->close();
+
+    $now = ['date_given' => (string)$date_given, 'customer_name' => $customer, 'redeemed_by' => $redeemed,
+        'payment_mode' => $payment, 'remarks' => $remarks, 'date_availed' => (string)$date_availed, 'note' => $note];
+    $before = $prev ?: array_fill_keys(array_keys($now), '');
+    $labels = ['date_given' => 'date given', 'customer_name' => 'customer', 'redeemed_by' => 'redeemed by',
+        'payment_mode' => 'payment', 'remarks' => 'remarks', 'date_availed' => 'date availed', 'note' => 'note'];
+    $changes = [];
+    foreach ($labels as $key => $label) {
+        $old = (string)($before[$key] ?? '');
+        if ($old !== $now[$key]) {
+            $changes[] = "$label: " . ($old === '' ? '(blank)' : $old) . ' -> ' . ($now[$key] === '' ? '(blank)' : $now[$key]);
+        }
+    }
+    if ($changes) {
+        $pad = max(3, strlen((string)$v['beginning']));
+        $ref = $v['name'] . ' #' . str_pad((string)$series, $pad, '0', STR_PAD_LEFT);
+        if ($empty) {
+            $act = 'Voucher entry cleared';
+        } elseif (!$prev) {
+            $act = 'Voucher entry added';
+        } elseif (($before['date_availed'] ?? '') === '' && $now['date_availed'] !== '') {
+            $act = 'Voucher availed';
+        } else {
+            $act = 'Voucher entry updated';
+        }
+        log_action($conn, $username, $act, $ref . ' — ' . implode('; ', $changes), $branch);
+    }
     json_success(['saved' => true]);
 }
 

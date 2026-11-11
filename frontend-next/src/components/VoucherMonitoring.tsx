@@ -30,7 +30,9 @@ const isGivenOut = (i?: Item) => !!i && (!!i.date_given || i.customer_name.trim(
 
 export default function VoucherMonitoring() {
   const { role } = useAuth();
-  const canManage = role === 'admin';
+  // The server decides who may add, resize and delete vouchers (admins, plus
+  // cashiers of some branches), so follow what it says.
+  const [canManage, setCanManage] = useState(role === 'admin');
   const [vouchers, setVouchers] = useState<Voucher[]>([]);
   const [activeId, setActiveId] = useState<number | null>(null);
   const [beginning, setBeginning] = useState(0);
@@ -59,6 +61,7 @@ export default function VoucherMonitoring() {
   async function loadList(selectId?: number | null) {
     const r = await api.get('/vouchers/index.php');
     setVouchers(r.vouchers);
+    if (typeof r.can_manage === 'boolean') setCanManage(r.can_manage);
     const next = selectId ?? activeId;
     const pick = r.vouchers.find((v: Voucher) => v.id === next) || r.vouchers[0];
     if (pick) await openVoucher(pick.id, false);
