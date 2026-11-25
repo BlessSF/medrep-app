@@ -87,15 +87,9 @@ export default function Layout({ children, sidebarStatus }: { children: ReactNod
         ['--sidebar-bg-dark' as any]: color,
         ['--sidebar-accent' as any]: color,
         ['--brand-primary' as any]: color,
+        ['--sidebar-solid' as any]: color + 'ee',     // solid sidebar background (styled in globals.css)
       }}
     >
-      {/* Override sidebar background to use solid branch color */}
-      <style>{`
-        .sidebar { background: ${color}ee !important; }
-        .sidebar .nav-link.active { background: rgba(255,255,255,0.15) !important; border-left-color: rgba(255,255,255,0.7) !important; }
-        .sidebar .nav-link:hover { background: rgba(255,255,255,0.08) !important; }
-      `}</style>
-
       <div className="mobile-topbar" style={{ background: color }}>
         <button className="hamburger-btn" onClick={() => setMobileOpen((v) => !v)} aria-label="Toggle menu">
           <span /><span /><span />

@@ -133,7 +133,6 @@ function TrackingPage() {
 
   return (
     <Layout>
-      <style>{CSS}</style>
       <div className="al">
         <header className="al-head">
           <div>
@@ -211,62 +210,6 @@ function TrackingPage() {
   );
 }
 
-const CSS = `
-.al { --a:var(--brand-primary,#b52e1f); --ink:#231d17; --mute:#7a7065; --line:#e6dfd4;
-  --green:#2b7a4b; --green-soft:#e6f3ec; --amber:#a76a0a; --amber-soft:#fcf1d9; --red:#b42318; --red-soft:#fdecea;
-  color:var(--ink); max-width:1200px; }
-.al *, .al *::before, .al *::after { box-sizing:border-box; }
-.al h1, .al h2 { margin:0; }
-
-.al-head { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap; margin-bottom:18px; }
-.al-head h1 { font-size:24px; font-weight:750; letter-spacing:-.02em; }
-.al-head p { margin:4px 0 0; font-size:13.5px; color:var(--mute); max-width:560px; }
-
-.al-btn { cursor:pointer; padding:8px 14px; border-radius:9px; border:1px solid var(--line); background:#fff; font:inherit; font-size:13px; font-weight:600; color:var(--ink); }
-.al-btn:hover:not(:disabled) { border-color:var(--a); color:var(--a); }
-.al-btn:disabled { opacity:.4; cursor:default; }
-.al-btn.solid { background:var(--a); border-color:var(--a); color:#fff; }
-
-.al-bar { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
-.al-bar select, .al-search input { padding:9px 12px; border:1px solid var(--line); border-radius:9px; background:#fff; font:inherit; font-size:13.5px; color:var(--ink); }
-.al-bar select { cursor:pointer; }
-.al-bar select:focus, .al-search input:focus { outline:2px solid var(--a); outline-offset:-1px; border-color:var(--a); }
-.al-search { position:relative; flex:1 1 220px; max-width:340px; }
-.al-search svg { position:absolute; left:11px; top:50%; transform:translateY(-50%); color:var(--mute); pointer-events:none; }
-.al-search input { width:100%; padding-left:33px; }
-
-.al-chips { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:16px; }
-.al-chip { cursor:pointer; padding:6px 12px; border-radius:99px; border:1px solid var(--line); background:#fff; font:inherit; font-size:13px; font-weight:600; color:#5b5249; }
-.al-chip em { font-style:normal; font-weight:500; font-size:11.5px; margin-left:6px; color:var(--mute); font-variant-numeric:tabular-nums; }
-.al-chip:hover { border-color:#cfc5b7; }
-.al-chip.on { background:var(--ink); border-color:var(--ink); color:#fff; }
-.al-chip.on em { color:rgba(255,255,255,.7); }
-
-.al-card { background:#fff; border:1px solid var(--line); border-radius:14px; margin-bottom:12px; }
-.al-state { padding:36px 20px; text-align:center; color:var(--mute); }
-.al-state.err { color:var(--red); }
-.al-state p { margin:0 0 12px; }
-
-.al-day { padding:6px 0; overflow:hidden; }
-.al-day h2 { font-size:12px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:var(--mute); padding:12px 18px 8px; }
-.al-day ul { list-style:none; margin:0; padding:0; }
-.al-day li { display:grid; grid-template-columns:78px 120px 190px minmax(0,1fr); gap:12px; align-items:start; padding:10px 18px; border-top:1px solid #f3ede4; font-size:13px; }
-.al-time { color:var(--mute); font-variant-numeric:tabular-nums; white-space:nowrap; padding-top:2px; }
-.al-user { font-weight:650; text-transform:capitalize; overflow:hidden; text-overflow:ellipsis; padding-top:2px; }
-.al-details { color:#4d443b; line-height:1.5; overflow-wrap:anywhere; padding-top:1px; }
-.al-pill { justify-self:start; padding:2px 10px; border-radius:99px; font-size:11.5px; font-weight:650; white-space:nowrap; background:#f1ebe2; color:#5b5249; }
-.al-pill.add { background:var(--green-soft); color:var(--green); }
-.al-pill.edit { background:var(--amber-soft); color:var(--amber); }
-.al-pill.delete, .al-pill.warn { background:var(--red-soft); color:var(--red); }
-
-.al-pager { display:flex; justify-content:center; align-items:center; gap:14px; margin:16px 0; font-size:13px; color:var(--mute); }
-
-@media (max-width:760px) {
-  .al-day li { grid-template-columns:1fr; gap:4px; }
-  .al-time { order:3; }
-  .al-search { max-width:none; }
-}
-`;
 
 export default function Page() {
   return (

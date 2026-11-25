@@ -150,7 +150,6 @@ function StaffPage() {
 
   return (
     <Layout>
-      <style>{CSS}</style>
       <div className="dt">
         <header className="dt-head">
           <h1>Daily Transaction</h1>
@@ -309,90 +308,6 @@ function StaffPage() {
   );
 }
 
-const CSS = `
-.dt { --a:var(--brand-primary,#b52e1f); --a-soft:color-mix(in srgb,var(--a) 9%,#fff); --ink:#231d17; --mute:#7a7065; --line:#e6dfd4;
-  --green:#2b7a4b; --green-soft:#e6f3ec; --red:#b42318; --red-soft:#fdecea; --card:#fff; color:var(--ink); max-width:1500px; }
-.dt *, .dt *::before, .dt *::after { box-sizing:border-box; }
-.dt h1, .dt h2 { margin:0; }
-
-.dt-head { display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:18px; }
-.dt-head h1 { font-size:24px; font-weight:750; letter-spacing:-.02em; }
-.dt-head span { font-size:13.5px; color:var(--mute); }
-
-.dt-grid { display:grid; grid-template-columns:minmax(340px,420px) minmax(0,1fr); gap:18px; align-items:start; }
-.dt-card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:20px; }
-.dt-card h2 { font-size:16px; font-weight:700; margin-bottom:14px; }
-
-/* form */
-.dt-form { position:sticky; top:16px; }
-.dt-field { display:flex; flex-direction:column; gap:6px; margin-bottom:14px; }
-.dt-field > span { font-size:12.5px; font-weight:600; color:#5b5249; }
-.dt-field > span em { font-style:normal; font-weight:400; color:var(--mute); margin-left:4px; }
-.dt-field input, .dt-field textarea { width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:9px; background:#fff; font:inherit; font-size:14px; color:var(--ink); }
-.dt-field textarea { resize:vertical; min-height:60px; }
-.dt-field input::placeholder, .dt-field textarea::placeholder { color:#b9ada0; }
-.dt-field input:focus, .dt-field textarea:focus { outline:2px solid var(--a); outline-offset:-1px; border-color:var(--a); }
-.dt-gap { margin-top:8px; }
-.dt-two { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-.dt-warn { margin:-8px 0 14px; padding:8px 10px; border-radius:8px; background:var(--red-soft); color:var(--red); font-size:12.5px; }
-
-.dt-chips { display:flex; flex-wrap:wrap; gap:6px; }
-.dt-chip { cursor:pointer; padding:7px 12px; border-radius:8px; border:1px solid var(--line); background:#fff; font:inherit; font-size:13px; font-weight:550; color:#4d443b; transition:border-color .12s, background .12s; }
-.dt-chip:hover { border-color:#cfc5b7; background:#faf7f2; }
-.dt-chip.on { background:var(--a); border-color:var(--a); color:#fff; }
-.dt-chip:focus-visible { outline:2px solid var(--a); outline-offset:2px; }
-
-.dt-amount { display:flex; align-items:center; border:1px solid var(--line); border-radius:9px; background:#fff; padding-left:12px; }
-.dt-amount:focus-within { outline:2px solid var(--a); outline-offset:-1px; border-color:var(--a); }
-.dt-amount b { font-size:18px; color:var(--mute); font-weight:600; }
-.dt-amount input { border:0 !important; outline:0 !important; font-size:20px !important; font-weight:650; font-variant-numeric:tabular-nums; padding:9px 12px 9px 8px !important; background:transparent !important; }
-
-.dt-submit { width:100%; margin-top:4px; padding:12px; border:0; border-radius:10px; background:var(--a); color:#fff; font:inherit; font-size:14.5px; font-weight:650; cursor:pointer; transition:filter .12s; }
-.dt-submit:hover:not(:disabled) { filter:brightness(.9); }
-.dt-submit:disabled { opacity:.6; cursor:default; }
-
-/* feed */
-.dt-feed-head { display:flex; justify-content:space-between; align-items:flex-end; gap:12px; flex-wrap:wrap; margin-bottom:14px; }
-.dt-feed-head h2 { margin-bottom:2px; }
-.dt-feed-head small { font-size:12.5px; color:var(--mute); }
-.dt-search { position:relative; width:min(100%,280px); }
-.dt-search svg { position:absolute; left:11px; top:50%; transform:translateY(-50%); color:var(--mute); pointer-events:none; }
-.dt-search input { width:100%; padding:9px 12px 9px 33px; border:1px solid var(--line); border-radius:9px; font:inherit; font-size:13.5px; background:#fff; }
-.dt-search input:focus { outline:2px solid var(--a); outline-offset:-1px; border-color:var(--a); }
-
-.dt-table-wrap { overflow-x:auto; border:1px solid var(--line); border-radius:10px; }
-.dt-table { width:100%; min-width:760px; border-collapse:collapse; font-size:13px; display:table; white-space:normal; }
-.dt-table thead th { background:#f7f3ec; color:var(--mute); font-size:11px; font-weight:650; letter-spacing:.06em; text-transform:uppercase; padding:10px 12px; text-align:left; border-bottom:1px solid var(--line); white-space:nowrap; }
-.dt-table td { padding:11px 12px; border-bottom:1px solid #f1ebe2; vertical-align:top; }
-.dt-table tbody tr:last-child td { border-bottom:0; }
-.dt-table tbody tr:hover { background:#fdfbf8; }
-.dt-table .r { text-align:right; }
-.dt-name { font-weight:650; text-transform:uppercase; font-size:12.5px; letter-spacing:.01em; }
-.dt-co { font-size:12px; color:var(--mute); text-transform:uppercase; margin-top:1px; }
-.dt-money { font-variant-numeric:tabular-nums; font-weight:600; white-space:nowrap; }
-.dt-remarks { max-width:340px; color:#4d443b; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; text-transform:uppercase; font-size:12.5px; }
-.dt-dash { color:#c4b9ab; }
-.dt-via { color:var(--mute); white-space:nowrap; }
-.dt-date { color:var(--mute); white-space:nowrap; font-size:12.5px; }
-.dt-none { text-align:center; padding:36px 12px !important; color:var(--mute); }
-.dt-pill { display:inline-block; padding:2px 9px; border-radius:99px; background:#f1ebe2; color:#5b5249; font-size:11.5px; font-weight:650; white-space:nowrap; }
-.dt-pill.in { background:var(--green-soft); color:var(--green); }
-.dt-pill.out { background:var(--red-soft); color:var(--red); }
-
-.dt-pager { display:flex; align-items:center; justify-content:center; gap:14px; margin-top:14px; font-size:13px; color:var(--mute); }
-.dt-pager button { cursor:pointer; padding:7px 13px; border-radius:8px; border:1px solid var(--line); background:#fff; font:inherit; font-size:13px; font-weight:600; color:var(--ink); }
-.dt-pager button:hover:not(:disabled) { border-color:var(--a); color:var(--a); }
-.dt-pager button:disabled { opacity:.4; cursor:default; }
-
-@media (max-width:1100px) {
-  .dt-grid { grid-template-columns:1fr; }
-  .dt-form { position:static; }
-}
-@media (max-width:560px) {
-  .dt-card { padding:14px; }
-  .dt-two { grid-template-columns:1fr; }
-}
-`;
 
 export default function Page() {
   return (
