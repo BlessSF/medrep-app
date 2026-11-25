@@ -154,8 +154,18 @@ export default function Login() {
               <input id="lg-pass" name="password" className="lg-input" type={showPassword ? 'text' : 'password'}
                 value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required />
               <button type="button" className="lg-show" onClick={() => setShowPassword((v) => !v)}
-                aria-pressed={showPassword}>
-                {showPassword ? 'Hide' : 'Show'}
+                aria-label={showPassword ? 'Hide password' : 'Show password'} aria-pressed={showPassword}
+                title={showPassword ? 'Hide password' : 'Show password'}>
+                {showPassword ? (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M3 3l18 18" /><path d="M10.6 6.1A9.6 9.6 0 0 1 12 6c6 0 9.5 6 9.5 6a16 16 0 0 1-3.2 3.9" />
+                    <path d="M6.6 7.6A16 16 0 0 0 2.5 12S6 18 12 18c1.5 0 2.8-.4 4-.9" /><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" />
+                  </svg>
+                ) : (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M2.5 12S6 6 12 6s9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" /><circle cx="12" cy="12" r="3" />
+                  </svg>
+                )}
               </button>
             </div>
           </div>
@@ -215,8 +225,12 @@ const CSS = `
 .lg-input:focus { outline:none; border-bottom-color:var(--bc); box-shadow:0 1.5px 0 var(--bc); }
 .lg-select { cursor:pointer; }
 .lg-pw { position:relative; }
-.lg-pw .lg-input { padding-right:56px; }
-.lg-show { position:absolute; right:0; bottom:10px; border:0; background:none; padding:0; font:inherit; font-size:12.5px; font-weight:700; letter-spacing:.04em; color:var(--bc); cursor:pointer; }
+.lg-pw .lg-input { padding-right:40px; }
+.lg-show { position:absolute; right:-6px; bottom:3px; width:36px; height:36px; display:grid; place-items:center; border:0; border-radius:8px; background:none; padding:0; color:#8b8073; cursor:pointer; transition:color .15s, background .15s; }
+.lg-show:hover { color:var(--bc); background:rgba(0,0,0,.05); }
+.lg-show:focus-visible { outline:2px solid var(--bc); outline-offset:0; }
+/* keep the browser's autofill from painting the fields blue */
+.lg-input:-webkit-autofill, .lg-input:-webkit-autofill:focus { -webkit-box-shadow:0 0 0 100px #faf8f4 inset; -webkit-text-fill-color:var(--ink); caret-color:var(--ink); transition:background-color 9999s; }
 
 .lg-submit { display:block; width:100%; margin-top:8px; padding:14px 18px; border:0; border-radius:4px; background:var(--bc); color:#fff; font:inherit;
   font-size:15px; font-weight:700; letter-spacing:.03em; cursor:pointer; transition:filter .15s, transform .05s; }
