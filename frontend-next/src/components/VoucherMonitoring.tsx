@@ -48,8 +48,6 @@ export default function VoucherMonitoring() {
   const [modal, setModal] = useState<'new' | 'beginning' | 'remove' | null>(null);
   const [formName, setFormName] = useState('');
   const [formQty, setFormQty] = useState('');
-  const stripRef = useRef<HTMLDivElement>(null);
-  const scrollStrip = (dir: number) => stripRef.current?.scrollBy({ left: dir * 340, behavior: 'smooth' });
 
   const flash = (text: string, kind: 'success' | 'error' = 'success') => {
     setMsg({ text, kind });
@@ -196,12 +194,6 @@ export default function VoucherMonitoring() {
     URL.revokeObjectURL(a.href);
   }
 
-  // keep the open voucher's tab in view when the strip is scrolled
-  useEffect(() => {
-    const el = stripRef.current?.querySelector('[aria-selected="true"]') as HTMLElement | null;
-    el?.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
-  }, [activeId, vouchers.length]);
-
   const saveLabel = save === 'saving' ? 'Saving…' : save === 'error' ? 'Save failed' : save === 'saved' ? 'All changes saved' : 'All changes save automatically';
 
   const pctOut = active && active.beginning ? Math.min(100, Math.round((active.given_out / active.beginning) * 100)) : 0;
@@ -222,17 +214,16 @@ export default function VoucherMonitoring() {
             <p>Track every voucher from stock, to customer, to redeemed.</p>
           </div>
           <dl className="vm-totals">
-            <div><dd>{rows.length}</dd><dt>Vouchers</dt></div>
-            <div><dd className="c-out">{totalOut.toLocaleString()}</dd><dt>Given out</dt></div>
-            <div><dd>{totalLeft.toLocaleString()}</dd><dt>In stock</dt></div>
-            <div><dd className="c-done">{totalAvailed.toLocaleString()}</dd><dt>Availed</dt></div>
+            <div><span className="vm-ti neutral"><TicketIcon small /></span><section><dd>{rows.length}</dd><dt>Vouchers</dt></section></div>
+            <div><span className="vm-ti out"><StatusIcon state="out" size={18} /></span><section><dd className="c-out">{totalOut.toLocaleString()}</dd><dt>Given out</dt></section></div>
+            <div><span className="vm-ti stock"><StatusIcon state="stock" size={18} /></span><section><dd>{totalLeft.toLocaleString()}</dd><dt>In stock</dt></section></div>
+            <div><span className="vm-ti done"><StatusIcon state="availed" size={18} /></span><section><dd className="c-done">{totalAvailed.toLocaleString()}</dd><dt>Availed</dt></section></div>
           </dl>
         </header>
 
         {/* ---------- Voucher picker: one scrolling row ---------- */}
         <div className="vm-strip-wrap">
-          <button className="vm-arrow" aria-label="Scroll vouchers left" onClick={() => scrollStrip(-1)}><ChevronIcon dir="left" /></button>
-          <div className="vm-strip" role="tablist" aria-label="Vouchers" ref={stripRef}>
+          <div className="vm-strip" role="tablist" aria-label="Vouchers">
             {rows.map((v) => {
               const out = v.beginning ? Math.min(100, (v.given_out / v.beginning) * 100) : 0;
               const av = v.beginning ? Math.min(out, (v.availed / v.beginning) * 100) : 0;
@@ -241,21 +232,20 @@ export default function VoucherMonitoring() {
                 <button key={v.id} role="tab" aria-selected={v.id === activeId}
                   className={'vm-tab' + (v.id === activeId ? ' on' : '')}
                   onClick={() => v.id !== activeId && openVoucher(v.id)}>
-                  <span className="vm-tab-name">{v.name}{low && <em>Low</em>}</span>
-                  <span className="vm-tab-nums"><b>{v.given_out.toLocaleString()}</b> / {v.beginning.toLocaleString()}
-                    {v.availed > 0 && <span className="vm-tab-av"><CheckIcon size={12} />{v.availed.toLocaleString()}</span>}
+                  <span className="vm-tab-name"><span className="vm-tab-ico"><TicketIcon small /></span><span className="vm-tab-t">{v.name}</span>{low && <em>Low</em>}</span>
+                  <span className="vm-tab-nums"><StatusIcon state="out" size={13} /><b>{v.given_out.toLocaleString()}</b> / {v.beginning.toLocaleString()}
+                    {v.availed > 0 && <span className="vm-tab-av"><StatusIcon state="availed" size={13} />{v.availed.toLocaleString()}</span>}
                   </span>
                   <span className="vm-bar"><i className="pending" style={{ width: out + '%' }} /><i className="done" style={{ width: av + '%' }} /></span>
                 </button>
               );
             })}
-          </div>
-          <button className="vm-arrow" aria-label="Scroll vouchers right" onClick={() => scrollStrip(1)}><ChevronIcon dir="right" /></button>
           {canManage && (
             <button className="vm-add" onClick={() => { setFormName(''); setFormQty(''); setModal('new'); }}>
-              <PlusIcon /> New voucher
+              <PlusIcon /> <span>New voucher</span>
             </button>
           )}
+          </div>
         </div>
 
         {loading && <div className="vm-empty">Loading vouchers…</div>}
@@ -474,7 +464,6 @@ function SaveIcon({ state }: { state: 'idle' | 'saving' | 'saved' | 'error' }) {
 }
 const CheckIcon = ({ size = 18 }: { size?: number }) => <svg width={size} height={size} viewBox="0 0 24 24" {...stroke}><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>;
 const PlusIcon = () => <svg width="15" height="15" viewBox="0 0 24 24" {...stroke}><path d="M12 5v14M5 12h14" /></svg>;
-const ChevronIcon = ({ dir }: { dir: 'left' | 'right' }) => <svg width="16" height="16" viewBox="0 0 24 24" {...stroke}><path d={dir === 'left' ? 'm15 6-6 6 6 6' : 'm9 6 6 6-6 6'} /></svg>;
 const SearchIcon = () => <svg className="vm-search-ico" width="16" height="16" viewBox="0 0 24 24" {...stroke}><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>;
 const DownloadIcon = () => <svg width="15" height="15" viewBox="0 0 24 24" {...stroke}><path d="M12 4v11M7 11l5 5 5-5M5 20h14" /></svg>;
 const TrashIcon = () => <svg width="15" height="15" viewBox="0 0 24 24" {...stroke}><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" /></svg>;
@@ -494,31 +483,38 @@ const VM_CSS = `
 .vm-head h1 { font-size:26px; font-weight:750; letter-spacing:-.02em; }
 .vm-head p { margin:4px 0 0; font-size:14px; color:var(--mute); }
 .vm-totals { display:flex; margin:0; background:var(--card); border:1px solid var(--line); border-radius:12px; }
-.vm-totals > div { padding:10px 22px; border-left:1px solid var(--line); min-width:104px; }
+.vm-totals > div { display:flex; align-items:center; gap:12px; padding:10px 22px 10px 16px; border-left:1px solid var(--line); min-width:150px; }
+.vm-totals section { display:block; }
+.vm-ti { flex:none; width:36px; height:36px; border-radius:10px; display:grid; place-items:center; background:#f1ebe2; color:var(--mute); }
+.vm-ti.neutral { background:var(--a-soft); color:var(--a); }
+.vm-ti.out { background:var(--warn-soft); color:var(--warn); }
+.vm-ti.done { background:var(--green-soft); color:var(--green); }
 .vm-totals > div:first-child { border-left:0; }
 .vm-totals dd { margin:0; font-size:21px; font-weight:750; line-height:1.15; font-variant-numeric:tabular-nums; letter-spacing:-.01em; }
 .vm-totals dt { margin-top:2px; font-size:11px; letter-spacing:.07em; text-transform:uppercase; color:var(--mute); }
 .vm .c-out { color:var(--warn); } .vm .c-done { color:var(--green); }
 
 /* picker: a single row that scrolls sideways */
-.vm-strip-wrap { display:flex; align-items:stretch; gap:8px; margin-bottom:18px; }
-.vm-strip { flex:1; min-width:0; display:flex; gap:8px; overflow-x:auto; scroll-snap-type:x proximity; scrollbar-width:none; padding:2px; }
-.vm-strip::-webkit-scrollbar { display:none; }
-.vm-arrow { flex:none; width:34px; border:1px solid var(--line); border-radius:10px; background:var(--card); color:var(--mute); cursor:pointer; display:grid; place-items:center; }
-.vm-arrow:hover { color:var(--a); border-color:var(--a-line); }
-.vm-tab { flex:none; width:176px; scroll-snap-align:start; cursor:pointer; text-align:left; font:inherit; color:var(--ink); display:flex; flex-direction:column; gap:5px; padding:11px 13px 11px;
+.vm-strip-wrap { display:block; margin-bottom:18px; }
+.vm-strip { flex:1; min-width:0; display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:10px; }
+.vm-tab { min-width:0; cursor:pointer; text-align:left; font:inherit; color:var(--ink); display:flex; flex-direction:column; gap:5px; padding:11px 13px 11px;
   background:var(--card); border:1px solid var(--line); border-radius:10px; transition:border-color .15s, box-shadow .15s; }
 .vm-tab:hover { border-color:var(--a-line); }
 .vm-tab.on { border-color:var(--a); box-shadow:0 0 0 3px var(--a-soft); }
-.vm-tab-name { display:flex; align-items:center; justify-content:space-between; gap:6px; font-size:12px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.vm-tab-name em { font-style:normal; font-size:9.5px; letter-spacing:.06em; padding:1px 6px; border-radius:99px; background:var(--warn-soft); color:var(--warn); }
+.vm-tab-name { display:flex; align-items:center; gap:8px; font-size:12px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.vm-tab-ico { flex:none; width:24px; height:24px; border-radius:7px; display:grid; place-items:center; background:var(--a-soft); color:var(--a); }
+.vm-tab-ico svg { width:14px; height:14px; }
+.vm-tab-t { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; }
+.vm-tab.on .vm-tab-ico { background:var(--a); color:#fff; }
+.vm-tab-nums svg { color:var(--warn); }
+.vm-tab-name em { flex:none; font-style:normal; font-size:9.5px; letter-spacing:.06em; padding:1px 6px; border-radius:99px; background:var(--warn-soft); color:var(--warn); }
 .vm-tab-nums { display:flex; align-items:center; gap:4px; font-size:12px; color:var(--mute); font-variant-numeric:tabular-nums; }
 .vm-tab-nums b { font-size:17px; color:var(--ink); font-weight:750; }
 .vm-tab-av { margin-left:auto; display:inline-flex; align-items:center; gap:2px; color:var(--green); font-weight:650; }
 .vm-bar { position:relative; display:block; height:4px; border-radius:99px; background:#efe8de; overflow:hidden; }
 .vm-bar i { position:absolute; left:0; top:0; bottom:0; border-radius:99px; transition:width .3s; }
 .vm-bar i.pending { background:#e0a540; } .vm-bar i.done { background:var(--green); }
-.vm-add { flex:none; display:inline-flex; align-items:center; gap:7px; padding:0 16px; border:1.5px dashed var(--a-line); border-radius:10px; background:transparent; color:var(--a); font:inherit; font-size:13.5px; font-weight:650; cursor:pointer; white-space:nowrap; }
+.vm-add { min-height:78px; display:flex; align-items:center; justify-content:center; gap:7px; padding:0 16px; border:1.5px dashed var(--a-line); border-radius:10px; background:transparent; color:var(--a); font:inherit; font-size:13.5px; font-weight:650; cursor:pointer; white-space:nowrap; }
 .vm-add:hover { background:var(--a-soft); border-color:var(--a); }
 
 /* empty states */
@@ -619,15 +615,16 @@ const VM_CSS = `
 
 @media (max-width:900px) {
   .vm-totals { width:100%; }
-  .vm-totals > div { flex:1; padding:10px 14px; min-width:0; }
+  .vm-totals { flex-wrap:wrap; }
+  .vm-totals > div { flex:1 1 45%; padding:10px 14px; min-width:0; }
+  .vm-totals > div:nth-child(3) { border-left:0; }
   .vm-sum-grid { grid-template-columns:repeat(2,minmax(0,1fr)); row-gap:16px; }
   .vm-sum-grid > div:nth-child(3) { padding-left:0; border-left:0; }
 }
 @media (max-width:700px) {
   .vm-panel { padding:14px; border-radius:12px; }
   .vm-count { margin-left:0; }
-  .vm-arrow { display:none; }
-  .vm-add { padding:0 12px; }
+    .vm-add { padding:0 12px; }
   .vm-totals dd { font-size:18px; }
 }
 `;
