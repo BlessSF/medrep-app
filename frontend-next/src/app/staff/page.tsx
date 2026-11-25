@@ -71,7 +71,7 @@ function StaffPage() {
   const firstRun = useRef(true);
 
   const today = useMemo(
-    () => new Date().toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric' }),
+    () => new Date().toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'Asia/Manila' }),
     [],
   );
 

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Layout from '../../../components/Layout';
 import RequireAuth from '../../../components/RequireAuth';
 import api, { ApiError } from '../../../api/client';
-import { MONTH_NAMES } from '../../../lib/format';
+import { MONTH_NAMES, PH_TZ, parseServerDate } from '../../../lib/format';
 
 type Log = { id: number; timestamp: string; username: string; action: string; details: string };
 type Kind = 'add' | 'edit' | 'delete' | 'auth' | 'warn';
@@ -29,12 +29,9 @@ function prettyAction(action: string) {
   return t.charAt(0).toUpperCase() + t.slice(1);
 }
 
-function parseDate(v: string) {
-  const d = new Date(String(v).replace(' ', 'T'));
-  return Number.isNaN(d.getTime()) ? null : d;
-}
-const dayLabel = (d: Date) => d.toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
-const timeLabel = (d: Date) => d.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' });
+const parseDate = parseServerDate;
+const dayLabel = (d: Date) => d.toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: PH_TZ });
+const timeLabel = (d: Date) => d.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit', timeZone: PH_TZ });
 
 function TrackingPage() {
   const now = new Date();
@@ -116,7 +113,7 @@ function TrackingPage() {
   function exportCsv() {
     const esc = (s: unknown) => `"${String(s ?? '').replace(/"/g, '""')}"`;
     const lines = [['When', 'User', 'Action', 'Details'].map(esc).join(',')];
-    for (const l of shown) lines.push([l.timestamp, l.username, prettyAction(l.action), l.details].map(esc).join(','));
+    for (const l of shown) lines.push([(() => { const d = parseServerDate(l.timestamp); return d ? d.toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short', timeZone: PH_TZ }) : l.timestamp; })(), l.username, prettyAction(l.action), l.details].map(esc).join(','));
     const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
