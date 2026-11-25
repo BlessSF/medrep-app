@@ -36,4 +36,4 @@ $_SESSION['role'] = $role;
 $_SESSION['branch'] = $user['branch'];
 
 log_action($conn, $user['username'], 'Logged in', 'Signed in as ' . $role, $user['branch']);
-json_success(['username' => $user['username'], 'role' => $role, 'branch' => $user['branch'], 'token' => session_id()]);
+json_success(['username' => $user['username'], 'role' => $role, 'branch' => $user['branch'], 'token' => session_id(), 'server_now' => db_now($conn)]);

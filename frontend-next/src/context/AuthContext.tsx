@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import api, { ApiError } from '../api/client';
+import { setServerClock } from '../lib/format';
 
 type Role = 'admin' | 'cashier' | '';
 
@@ -31,6 +32,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     api
       .get('/auth/me.php')
       .then((r) => {
+        setServerClock(r.server_now);
         setUsername(r.username);
         setRole(r.role);
         setBranch(r.branch || null);
@@ -54,6 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (branchName: string, u: string, p: string) => {
     const r = await api.post('/auth/login.php', { branch: branchName, username: u, password: p });
     if (r.token) api.setToken(r.token);
+    setServerClock(r.server_now);
     setUsername(r.username);
     setRole(r.role);
     setBranch(r.branch || branchName);

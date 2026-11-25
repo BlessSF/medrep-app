@@ -128,6 +128,13 @@ function require_role(mysqli $conn, string $username, array $roles): string {
     return $role;
 }
 
+// Current time on the database server, "YYYY-MM-DD HH:MM:SS" (same clock as CURRENT_TIMESTAMP).
+function db_now(mysqli $conn): string {
+    $r = $conn->query('SELECT NOW() AS n');
+    $row = $r ? $r->fetch_assoc() : null;
+    return $row['n'] ?? date('Y-m-d H:i:s');
+}
+
 function log_action(mysqli $conn, string $username, string $action, string $details, string $branch = null) {
     $branch = $branch ?? ($_SESSION['branch'] ?? 'STELLA');
     $stmt = $conn->prepare("INSERT INTO logs (action, username, details, branch) VALUES (?, ?, ?, ?)");
