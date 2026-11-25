@@ -5,6 +5,7 @@ import Layout from './Layout';
 import { Banner, Modal } from './ui';
 import { useAuth } from '../context/AuthContext';
 import api, { ApiError } from '../api/client';
+import { exportVouchersWorkbook } from '../lib/exportVouchers';
 
 type Voucher = { id: number; name: string; beginning: number; given_out: number; availed: number };
 type Item = {
@@ -29,7 +30,7 @@ const blank = (series: number): Item => ({
 const isGivenOut = (i?: Item) => !!i && (!!i.date_given || i.customer_name.trim() !== '');
 
 export default function VoucherMonitoring() {
-  const { role } = useAuth();
+  const { role, branch } = useAuth();
   // The server decides who may add, resize and delete vouchers (admins, plus
   // cashiers of some branches), so follow what it says.
   const [canManage, setCanManage] = useState(role === 'admin');
@@ -43,6 +44,7 @@ export default function VoucherMonitoring() {
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState<'all' | 'given' | 'availed'>('all');
   const [page, setPage] = useState(0);
+  const [exporting, setExporting] = useState(false);
   const [save, setSave] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [msg, setMsg] = useState<{ text: string; kind: 'success' | 'error' } | null>(null);
   const [modal, setModal] = useState<'new' | 'beginning' | 'remove' | null>(null);
@@ -176,22 +178,22 @@ export default function VoucherMonitoring() {
     } catch (err) { flash(errText(err, 'Could not remove voucher.'), 'error'); }
   }
 
-  function exportExcel() {
-    if (!active) return;
-    const esc = (s: unknown) => `"${String(s ?? '').replace(/"/g, '""')}"`;
-    const head = ['Date', 'Sold out', 'Series no.', 'Customer name', 'Redeemed by', 'Mode of payment', 'Remarks', 'Date availed', 'Note (c/o Acctng)'];
-    const lines = [head.map(esc).join(',')];
-    for (let n = 1; n <= beginning; n++) {
-      const it = items[n] || blank(n);
-      lines.push([longDate(it.date_given), isGivenOut(it) ? 'SOLD OUT' : 'IN STOCK', String(n).padStart(pad, '0'),
-        it.customer_name, it.redeemed_by, it.payment_mode, it.remarks, longDate(it.date_availed), it.note].map(esc).join(','));
+  // One workbook: a Summary tab plus a tab for every voucher, in the branch colour.
+  async function exportExcel() {
+    if (exporting || vouchers.length === 0) return;
+    setExporting(true);
+    try {
+      const all = [];
+      for (const v of vouchers) {
+        const r = await api.get(`/vouchers/index.php?id=${v.id}`);
+        all.push({ name: v.name, beginning: r.voucher.beginning as number, items: r.items as Item[] });
+      }
+      await exportVouchersWorkbook(branch, all);
+    } catch (e) {
+      flash(errText(e, 'Could not export the vouchers.'), 'error');
+    } finally {
+      setExporting(false);
     }
-    const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `${active.name.replace(/[^\w]+/g, '_')}_${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(a.href);
   }
 
   const saveLabel = save === 'saving' ? 'Saving…' : save === 'error' ? 'Save failed' : save === 'saved' ? 'All changes saved' : 'All changes save automatically';
@@ -274,7 +276,7 @@ export default function VoucherMonitoring() {
                 <span className={'vm-save ' + save}><SaveIcon state={save} />{saveLabel}</span>
               </div>
               <div className="vm-actions">
-                <button className="vm-btn" onClick={exportExcel}><DownloadIcon /> Export to Excel</button>
+                <button className="vm-btn" onClick={exportExcel} disabled={exporting}><DownloadIcon /> {exporting ? 'Preparing…' : 'Export all to Excel'}</button>
                 {canManage && <button className="vm-btn danger" onClick={() => setModal('remove')}><TrashIcon /> Remove</button>}
               </div>
             </div>
