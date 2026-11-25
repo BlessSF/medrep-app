@@ -29,6 +29,9 @@ function getBranchColor(branch: string, settings: Record<string, BranchSettings>
   return settings[key]?.color ?? FALLBACKS[key] ?? '#1b4332';
 }
 
+// Up to this many branches are shown as tabs; more than that falls back to a dropdown.
+const MAX_TABS = 4;
+
 export default function Login() {
   const { login } = useAuth();
   const router = useRouter();
@@ -63,8 +66,7 @@ export default function Login() {
 
   useEffect(() => { loadBranches(); }, []);
 
-  function handleBranchChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    const selected = e.target.value;
+  function chooseBranch(selected: string) {
     setBranch(selected);
     setImgSrc(getBranchImage(selected, branchSettings));
     setBranchColor(getBranchColor(selected, branchSettings));
@@ -85,111 +87,158 @@ export default function Login() {
   }
 
   return (
-    <div className="login-shell-v2">
-      {/* Left panel — hero image */}
-      <div className="login-hero-panel">
-        <div className="login-hero-overlay" />
+    <div className="lg" style={{ ['--bc' as any]: branchColor }}>
+      <style>{CSS}</style>
+
+      {/* Photo of the branch */}
+      <div className="lg-photo">
         {imgSrc && (
-          <img
-            key={imgSrc}
-            src={imgSrc}
-            alt={branch || 'Branch'}
-            className="login-hero-img"
-            onError={() => setImgSrc('')}
-          />
+          <img key={imgSrc} src={imgSrc} alt="" className="lg-img" onError={() => setImgSrc('')} />
         )}
-        <div className="login-hero-badge">
-          <span className="login-hero-badge-h" style={{ background: branchColor }}>
-            {branch ? branch[0] : 'H'}
-          </span>
-          <div>
-            <div className="login-hero-badge-title">{branch || 'H Breakfast to Bar'}</div>
-            <div className="login-hero-badge-sub">Transaction Ledger System</div>
-          </div>
+        <div className="lg-caption">
+          <h2>{branch || 'MEDREP'}</h2>
+          <p>Transaction ledger</p>
         </div>
-        {branch && <div className="login-hero-branch-tag">{branch}</div>}
       </div>
 
-      {/* Right panel — form */}
-      <div className="login-form-panel">
-        <div className="login-form-inner">
-          <div className="login-logo-row">
-            <div className="login-logo-mark" style={{ background: branchColor }}>
-              <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-                <text x="11" y="16" textAnchor="middle" fill="white" fontSize="14" fontWeight="800" fontFamily="sans-serif">
-                  {branch ? branch[0] : 'H'}
-                </text>
-              </svg>
-            </div>
-            <span className="login-logo-text">MEDREP</span>
-          </div>
+      {/* Sign-in form */}
+      <main className="lg-panel">
+        <form className="lg-form" onSubmit={handleSubmit}>
+          <div className="lg-brand">MEDREP{branch && <> <span>/</span> <b>{branch}</b></>}</div>
 
-          <h1 className="login-heading">Welcome back</h1>
-          <p className="login-sub">Sign in to the transaction ledger</p>
+          <h1>Sign in</h1>
+          <p className="lg-sub">Use the account your admin gave you.</p>
 
-          {error && (
-            <div className="login-error-banner">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-              {error}
-            </div>
-          )}
+          {error && <div className="lg-error" role="alert">{error}</div>}
 
-          <form onSubmit={handleSubmit} className="login-form">
-            <div className="lfield">
-              <label className="lfield-label">Branch</label>
-              <div className="lfield-select-wrap">
-                <select value={branch} onChange={handleBranchChange} required className="lfield-select"
-                  style={{ '--focus-color': branchColor } as any}
-                >
-                  {branches.length === 0 && <option value="">{branchError ? 'Could not load branches' : 'Loading branches…'}</option>}
-                  {branches.map((b) => <option key={b} value={b}>{b}</option>)}
-                </select>
-                <svg className="lfield-select-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
-              </div>
-            </div>
-
-            {branchError && (
-              <div className="login-error-banner">
-                {branchError}{' '}
-                <button type="button" onClick={loadBranches} style={{ background: 'none', border: 0, padding: 0, color: 'inherit', textDecoration: 'underline', cursor: 'pointer', font: 'inherit' }}>Try again</button>
+          <div className="lg-field">
+            <span className="lg-label" id="lg-branch-label">Branch</span>
+            {branches.length === 0 && (
+              <div className="lg-muted">
+                {branchError ? (
+                  <>
+                    {branchError}{' '}
+                    <button type="button" className="lg-linkbtn" onClick={loadBranches}>Try again</button>
+                  </>
+                ) : 'Loading branches…'}
               </div>
             )}
-
-            <div className="lfield">
-              <label className="lfield-label">Username</label>
-              <div className="lfield-input-wrap">
-                <svg className="lfield-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                <input className="lfield-input" value={username} onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Enter your username" autoFocus required />
+            {branches.length > 0 && branches.length <= MAX_TABS && (
+              <div className="lg-tabs" role="tablist" aria-labelledby="lg-branch-label">
+                {branches.map((b) => (
+                  <button key={b} type="button" role="tab" aria-selected={b === branch}
+                    className={'lg-tab' + (b === branch ? ' on' : '')} onClick={() => chooseBranch(b)}>
+                    {b}
+                  </button>
+                ))}
               </div>
+            )}
+            {branches.length > MAX_TABS && (
+              <select className="lg-input lg-select" value={branch} onChange={(e) => chooseBranch(e.target.value)}
+                aria-labelledby="lg-branch-label" required>
+                {branches.map((b) => <option key={b} value={b}>{b}</option>)}
+              </select>
+            )}
+          </div>
+
+          <div className="lg-field">
+            <label className="lg-label" htmlFor="lg-user">Username</label>
+            <input id="lg-user" name="username" className="lg-input" value={username}
+              onChange={(e) => setUsername(e.target.value)} autoComplete="username"
+              autoCapitalize="none" autoCorrect="off" spellCheck={false} autoFocus required />
+          </div>
+
+          <div className="lg-field">
+            <label className="lg-label" htmlFor="lg-pass">Password</label>
+            <div className="lg-pw">
+              <input id="lg-pass" name="password" className="lg-input" type={showPassword ? 'text' : 'password'}
+                value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required />
+              <button type="button" className="lg-show" onClick={() => setShowPassword((v) => !v)}
+                aria-pressed={showPassword}>
+                {showPassword ? 'Hide' : 'Show'}
+              </button>
             </div>
+          </div>
 
-            <div className="lfield">
-              <label className="lfield-label">Password</label>
-              <div className="lfield-input-wrap">
-                <svg className="lfield-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                <input className="lfield-input" type={showPassword ? 'text' : 'password'}
-                  value={password} onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter your password" required />
-                <button type="button" className="lfield-eye" onClick={() => setShowPassword(v => !v)} tabIndex={-1}>
-                  {showPassword
-                    ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-                    : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                  }
-                </button>
-              </div>
-            </div>
+          <button className="lg-submit" type="submit" disabled={busy || !branch}>
+            {busy ? 'Signing in…' : 'Sign in'}
+          </button>
 
-            <button className="login-submit-btn" type="submit" disabled={busy || !branch}
-              style={{ background: branchColor }}
-            >
-              {busy ? (<><span className="login-spinner" />Signing in…</>) : (<>Sign in <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></>)}
-            </button>
-          </form>
-
-          <p className="login-footer">MEDREP · Internal use only</p>
-        </div>
-      </div>
+          <p className="lg-foot">Forgot your password? Ask your branch admin to reset it.</p>
+        </form>
+      </main>
     </div>
   );
 }
+
+const CSS = `
+.lg { --ink:#1d1a16; --mute:#7d7266; --rule:#d3cabc; min-height:100vh; min-height:100dvh; display:grid;
+  grid-template-columns:minmax(0,1.25fr) minmax(400px,.75fr); background:#faf8f4; color:var(--ink); }
+.lg *, .lg *::before, .lg *::after { box-sizing:border-box; }
+:where(.lg h1, .lg h2, .lg p) { margin:0; }
+
+/* photo */
+.lg-photo { position:relative; overflow:hidden; background:#1d1a16; min-height:100%; }
+.lg-photo::after { content:''; position:absolute; inset:0; background:linear-gradient(to top, rgba(10,8,6,.78) 0%, rgba(10,8,6,0) 48%); }
+.lg-photo::before { content:''; position:absolute; top:0; right:0; bottom:0; width:5px; background:var(--bc); z-index:2; transition:background .3s; }
+.lg-img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; animation:lgfade .5s ease; }
+@keyframes lgfade { from { opacity:0; } to { opacity:1; } }
+.lg-caption { position:absolute; z-index:1; left:clamp(24px,4vw,56px); bottom:clamp(24px,4vw,48px); right:24px; color:#fff; }
+.lg-caption h2 { font-size:clamp(32px,4.2vw,56px); font-weight:800; letter-spacing:-.03em; line-height:1; text-transform:uppercase; }
+.lg-caption p { margin-top:8px; font-size:14px; letter-spacing:.04em; opacity:.85; }
+
+/* panel */
+.lg-panel { display:flex; align-items:center; padding:48px clamp(24px,5vw,72px); }
+.lg-form { width:100%; max-width:360px; }
+.lg-brand { font-size:12px; font-weight:700; letter-spacing:.2em; color:var(--mute); margin-bottom:44px; }
+.lg-brand span { margin:0 4px; opacity:.5; }
+.lg-brand b { color:var(--bc); font-weight:800; }
+.lg h1 { font-size:32px; font-weight:780; letter-spacing:-.025em; line-height:1.1; }
+.lg-sub { margin:8px 0 30px; font-size:14.5px; color:var(--mute); }
+
+.lg-field { margin-bottom:24px; }
+.lg-label { display:block; margin-bottom:4px; font-size:11.5px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:#6f655a; }
+.lg-muted { font-size:14px; color:var(--mute); padding:8px 0; }
+.lg-linkbtn { border:0; background:none; padding:0; font:inherit; color:var(--bc); font-weight:650; text-decoration:underline; cursor:pointer; }
+
+/* branch tabs */
+.lg-tabs { display:flex; flex-wrap:wrap; gap:0 22px; border-bottom:1.5px solid var(--rule); }
+.lg-tab { cursor:pointer; padding:8px 0 10px; margin-bottom:-1.5px; border:0; border-bottom:3px solid transparent; background:none; font:inherit; font-size:15px;
+  font-weight:700; letter-spacing:.05em; color:#9a8f82; transition:color .15s, border-color .15s; }
+.lg-tab:hover { color:var(--ink); }
+.lg-tab.on { color:var(--ink); border-bottom-color:var(--bc); }
+.lg-tab:focus-visible { outline:2px solid var(--bc); outline-offset:2px; }
+
+/* inputs: underline only */
+.lg-input { display:block; width:100%; padding:8px 0 10px; border:0; border-bottom:1.5px solid var(--rule); border-radius:0; background:transparent;
+  font:inherit; font-size:16px; color:var(--ink); transition:border-color .15s, box-shadow .15s; -webkit-appearance:none; appearance:none; }
+.lg-input:focus { outline:none; border-bottom-color:var(--bc); box-shadow:0 1.5px 0 var(--bc); }
+.lg-select { cursor:pointer; }
+.lg-pw { position:relative; }
+.lg-pw .lg-input { padding-right:56px; }
+.lg-show { position:absolute; right:0; bottom:10px; border:0; background:none; padding:0; font:inherit; font-size:12.5px; font-weight:700; letter-spacing:.04em; color:var(--bc); cursor:pointer; }
+
+.lg-submit { display:block; width:100%; margin-top:8px; padding:14px 18px; border:0; border-radius:4px; background:var(--bc); color:#fff; font:inherit;
+  font-size:15px; font-weight:700; letter-spacing:.03em; cursor:pointer; transition:filter .15s, transform .05s; }
+.lg-submit:hover:not(:disabled) { filter:brightness(.92); }
+.lg-submit:active:not(:disabled) { transform:translateY(1px); }
+.lg-submit:disabled { opacity:.5; cursor:default; }
+.lg-submit:focus-visible { outline:2px solid var(--ink); outline-offset:3px; }
+
+.lg-error { margin-bottom:22px; padding:10px 12px; border-left:3px solid #b42318; background:#fbefed; color:#8a1c12; font-size:13.5px; line-height:1.45; }
+.lg-foot { margin-top:26px; font-size:12.5px; line-height:1.5; color:#9a8f82; }
+
+/* phones and small tablets: photo becomes a banner on top */
+@media (max-width:860px) {
+  .lg { grid-template-columns:1fr; grid-template-rows:auto 1fr; }
+  .lg-photo { min-height:0; height:clamp(140px,26vh,200px); }
+  .lg-photo::before { top:auto; left:0; width:auto; height:4px; }
+  .lg-caption { left:24px; bottom:18px; }
+  .lg-caption h2 { font-size:28px; }
+  .lg-caption p { margin-top:4px; font-size:12.5px; }
+  .lg-panel { align-items:flex-start; padding:28px 24px 40px; }
+  .lg-form { max-width:440px; margin:0 auto; }
+  .lg-brand { margin-bottom:26px; }
+}
+@media (prefers-reduced-motion:reduce) { .lg-img { animation:none; } }
+`;
