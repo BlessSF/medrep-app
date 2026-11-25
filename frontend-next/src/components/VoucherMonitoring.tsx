@@ -234,7 +234,7 @@ export default function VoucherMonitoring() {
                   onClick={() => v.id !== activeId && openVoucher(v.id)}>
                   <span className="vm-tab-name"><span className="vm-tab-ico"><TicketIcon small /></span><span className="vm-tab-t">{v.name}</span>{low && <em>Low</em>}</span>
                   <span className="vm-tab-nums"><StatusIcon state="out" size={13} /><b>{v.given_out.toLocaleString()}</b> / {v.beginning.toLocaleString()}
-                    {v.availed > 0 && <span className="vm-tab-av"><StatusIcon state="availed" size={13} />{v.availed.toLocaleString()}</span>}
+                    {v.availed > 0 && <span className="vm-tab-av"><StatusIcon state="availed" size={13} />{v.availed.toLocaleString()} availed</span>}
                   </span>
                   <span className="vm-bar"><i className="pending" style={{ width: out + '%' }} /><i className="done" style={{ width: av + '%' }} /></span>
                 </button>
@@ -510,7 +510,8 @@ const VM_CSS = `
 .vm-tab-name em { flex:none; font-style:normal; font-size:9.5px; letter-spacing:.06em; padding:1px 6px; border-radius:99px; background:var(--warn-soft); color:var(--warn); }
 .vm-tab-nums { display:flex; align-items:center; gap:4px; font-size:12px; color:var(--mute); font-variant-numeric:tabular-nums; }
 .vm-tab-nums b { font-size:17px; color:var(--ink); font-weight:750; }
-.vm-tab-av { margin-left:auto; display:inline-flex; align-items:center; gap:2px; color:var(--green); font-weight:650; }
+.vm-tab-av { margin-left:auto; display:inline-flex; align-items:center; gap:4px; padding:2px 8px 2px 6px; border-radius:99px; background:var(--green-soft); color:var(--green); font-size:11.5px; font-weight:650; white-space:nowrap; }
+.vm-tab-nums .vm-tab-av svg { color:var(--green); }
 .vm-bar { position:relative; display:block; height:4px; border-radius:99px; background:#efe8de; overflow:hidden; }
 .vm-bar i { position:absolute; left:0; top:0; bottom:0; border-radius:99px; transition:width .3s; }
 .vm-bar i.pending { background:#e0a540; } .vm-bar i.done { background:var(--green); }
