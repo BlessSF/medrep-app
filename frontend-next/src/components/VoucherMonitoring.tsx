@@ -48,6 +48,8 @@ export default function VoucherMonitoring() {
   const [modal, setModal] = useState<'new' | 'beginning' | 'remove' | null>(null);
   const [formName, setFormName] = useState('');
   const [formQty, setFormQty] = useState('');
+  const stripRef = useRef<HTMLDivElement>(null);
+  const scrollStrip = (dir: number) => stripRef.current?.scrollBy({ left: dir * 340, behavior: 'smooth' });
 
   const flash = (text: string, kind: 'success' | 'error' = 'success') => {
     setMsg({ text, kind });
@@ -194,10 +196,18 @@ export default function VoucherMonitoring() {
     URL.revokeObjectURL(a.href);
   }
 
+  // keep the open voucher's tab in view when the strip is scrolled
+  useEffect(() => {
+    const el = stripRef.current?.querySelector('[aria-selected="true"]') as HTMLElement | null;
+    el?.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+  }, [activeId, vouchers.length]);
+
   const saveLabel = save === 'saving' ? 'Saving…' : save === 'error' ? 'Save failed' : save === 'saved' ? 'All changes saved' : 'All changes save automatically';
 
   const pctOut = active && active.beginning ? Math.min(100, Math.round((active.given_out / active.beginning) * 100)) : 0;
   const pctAvailed = active && active.given_out ? Math.min(100, Math.round((active.availed / active.given_out) * 100)) : 0;
+  const segAvailed = active && active.beginning ? Math.min(100, (active.availed / active.beginning) * 100) : 0;
+  const segPending = active && active.beginning ? Math.min(100 - segAvailed, (Math.max(0, active.given_out - active.availed) / active.beginning) * 100) : 0;
 
   return (
     <Layout>
@@ -207,41 +217,43 @@ export default function VoucherMonitoring() {
 
         {/* ---------- Page header ---------- */}
         <header className="vm-head">
-          <div className="vm-head-text">
+          <div>
             <h1>Voucher Monitoring</h1>
             <p>Track every voucher from stock, to customer, to redeemed.</p>
           </div>
-          <div className="vm-kpis">
-            <div className="vm-kpi"><span className="vm-kpi-ico"><TicketIcon small /></span><div><b>{rows.length}</b><small>Vouchers</small></div></div>
-            <div className="vm-kpi"><span className="vm-kpi-ico out"><ArrowIcon /></span><div><b>{totalOut.toLocaleString()}</b><small>Given out</small></div></div>
-            <div className="vm-kpi"><span className="vm-kpi-ico stock"><BoxIcon /></span><div><b>{totalLeft.toLocaleString()}</b><small>In stock</small></div></div>
-            <div className="vm-kpi"><span className="vm-kpi-ico done"><CheckIcon /></span><div><b>{totalAvailed.toLocaleString()}</b><small>Availed</small></div></div>
-          </div>
+          <dl className="vm-totals">
+            <div><dd>{rows.length}</dd><dt>Vouchers</dt></div>
+            <div><dd className="c-out">{totalOut.toLocaleString()}</dd><dt>Given out</dt></div>
+            <div><dd>{totalLeft.toLocaleString()}</dd><dt>In stock</dt></div>
+            <div><dd className="c-done">{totalAvailed.toLocaleString()}</dd><dt>Availed</dt></div>
+          </dl>
         </header>
 
-        {/* ---------- Voucher picker ---------- */}
-        <div className="vm-picker" role="tablist" aria-label="Vouchers">
-          {rows.map((v) => {
-            const pct = v.beginning ? Math.min(100, (v.given_out / v.beginning) * 100) : 0;
-            const low = v.beginning > 0 && v.beginning - v.given_out <= v.beginning * 0.1;
-            return (
-              <button key={v.id} role="tab" aria-selected={v.id === activeId}
-                className={'vm-card' + (v.id === activeId ? ' on' : '')}
-                onClick={() => v.id !== activeId && openVoucher(v.id)}>
-                <span className="vm-card-top">
-                  <span className="vm-card-name">{v.name}</span>
-                  {low && <span className="vm-chip warn">Low</span>}
-                </span>
-                <span className="vm-card-nums"><b>{v.given_out.toLocaleString()}</b><small>/ {v.beginning.toLocaleString()} out</small></span>
-                <span className="vm-card-availed"><i />{v.availed.toLocaleString()} availed</span>
-                <span className="vm-bar"><i style={{ width: pct + '%' }} /></span>
-              </button>
-            );
-          })}
+        {/* ---------- Voucher picker: one scrolling row ---------- */}
+        <div className="vm-strip-wrap">
+          <button className="vm-arrow" aria-label="Scroll vouchers left" onClick={() => scrollStrip(-1)}><ChevronIcon dir="left" /></button>
+          <div className="vm-strip" role="tablist" aria-label="Vouchers" ref={stripRef}>
+            {rows.map((v) => {
+              const out = v.beginning ? Math.min(100, (v.given_out / v.beginning) * 100) : 0;
+              const av = v.beginning ? Math.min(out, (v.availed / v.beginning) * 100) : 0;
+              const low = v.beginning > 0 && v.beginning - v.given_out <= v.beginning * 0.1;
+              return (
+                <button key={v.id} role="tab" aria-selected={v.id === activeId}
+                  className={'vm-tab' + (v.id === activeId ? ' on' : '')}
+                  onClick={() => v.id !== activeId && openVoucher(v.id)}>
+                  <span className="vm-tab-name">{v.name}{low && <em>Low</em>}</span>
+                  <span className="vm-tab-nums"><b>{v.given_out.toLocaleString()}</b> / {v.beginning.toLocaleString()}
+                    {v.availed > 0 && <span className="vm-tab-av"><CheckIcon size={12} />{v.availed.toLocaleString()}</span>}
+                  </span>
+                  <span className="vm-bar"><i className="pending" style={{ width: out + '%' }} /><i className="done" style={{ width: av + '%' }} /></span>
+                </button>
+              );
+            })}
+          </div>
+          <button className="vm-arrow" aria-label="Scroll vouchers right" onClick={() => scrollStrip(1)}><ChevronIcon dir="right" /></button>
           {canManage && (
-            <button className="vm-card vm-new" onClick={() => { setFormName(''); setFormQty(''); setModal('new'); }}>
-              <span className="vm-plus">+</span>
-              <span>New voucher</span>
+            <button className="vm-add" onClick={() => { setFormName(''); setFormQty(''); setModal('new'); }}>
+              <PlusIcon /> New voucher
             </button>
           )}
         </div>
@@ -269,7 +281,7 @@ export default function VoucherMonitoring() {
             <div className="vm-panel-head">
               <div>
                 <h2>{active.name}</h2>
-                <span className={'vm-save ' + save}><i />{saveLabel}</span>
+                <span className={'vm-save ' + save}><SaveIcon state={save} />{saveLabel}</span>
               </div>
               <div className="vm-actions">
                 <button className="vm-btn" onClick={exportExcel}><DownloadIcon /> Export to Excel</button>
@@ -277,27 +289,38 @@ export default function VoucherMonitoring() {
               </div>
             </div>
 
-            {/* ---------- Summary tiles ---------- */}
-            <div className="vm-stats">
-              <div className="vm-stat">
-                <label>Beginning</label>
-                <b>{active.beginning.toLocaleString()}</b>
-                {canManage && <button className="vm-link" onClick={() => { setFormQty(String(active.beginning)); setModal('beginning'); }}>Change quantity</button>}
+            {/* ---------- Summary: one strip + one stacked bar ---------- */}
+            <div className="vm-summary">
+              <div className="vm-sum-grid">
+                <div>
+                  <label>Beginning</label>
+                  <b>{active.beginning.toLocaleString()}</b>
+                  {canManage && <button className="vm-link" onClick={() => { setFormQty(String(active.beginning)); setModal('beginning'); }}>Change quantity</button>}
+                </div>
+                <div>
+                  <label>Given out</label>
+                  <b className="c-out">{active.given_out.toLocaleString()}</b>
+                  <small>{pctOut}% of stock</small>
+                </div>
+                <div>
+                  <label>Availed</label>
+                  <b className="c-done">{active.availed.toLocaleString()}</b>
+                  <small>{pctAvailed}% of given out</small>
+                </div>
+                <div>
+                  <label>Ending</label>
+                  <b>{(active.beginning - active.given_out).toLocaleString()}</b>
+                  <small>still in stock</small>
+                </div>
               </div>
-              <div className="vm-stat">
-                <label>Total out</label>
-                <b className="c-out">{active.given_out.toLocaleString()}</b>
-                <small>{pctOut}% given to customers</small>
+              <div className="vm-stack" role="img" aria-label={`${active.availed} availed, ${Math.max(0, active.given_out - active.availed)} given out and not yet availed, ${active.beginning - active.given_out} in stock`}>
+                <i className="done" style={{ width: segAvailed + '%' }} />
+                <i className="pending" style={{ width: segPending + '%' }} />
               </div>
-              <div className="vm-stat">
-                <label>Ending</label>
-                <b className="c-stock">{(active.beginning - active.given_out).toLocaleString()}</b>
-                <small>still available</small>
-              </div>
-              <div className="vm-stat">
-                <label>Availed</label>
-                <b className="c-done">{active.availed.toLocaleString()}</b>
-                <small>{pctAvailed}% of given out redeemed</small>
+              <div className="vm-legend">
+                <span><i className="done" />Availed</span>
+                <span><i className="pending" />Given out, not yet availed</span>
+                <span><i className="stock" />In stock</span>
               </div>
             </div>
 
@@ -311,8 +334,8 @@ export default function VoucherMonitoring() {
               </div>
               <div className="vm-seg" role="group" aria-label="Filter rows">
                 <button className={filter === 'all' ? 'on' : ''} onClick={() => { setFilter('all'); setPage(0); }}>All</button>
-                <button className={filter === 'given' ? 'on' : ''} onClick={() => { setFilter('given'); setPage(0); }}>Given out <em>{liveOut}</em></button>
-                <button className={filter === 'availed' ? 'on' : ''} onClick={() => { setFilter('availed'); setPage(0); }}>Availed <em>{liveAvailed}</em></button>
+                <button className={filter === 'given' ? 'on' : ''} onClick={() => { setFilter('given'); setPage(0); }}><StatusIcon state="out" size={14} />Given out <em>{liveOut}</em></button>
+                <button className={filter === 'availed' ? 'on' : ''} onClick={() => { setFilter('availed'); setPage(0); }}><StatusIcon state="availed" size={14} />Availed <em>{liveAvailed}</em></button>
               </div>
               <span className="vm-count">{series.length.toLocaleString()} {series.length === 1 ? 'row' : 'rows'}</span>
             </div>
@@ -334,11 +357,11 @@ export default function VoucherMonitoring() {
                   {visible.map((n) => {
                     const it = items[n] || blank(n);
                     const out = isGivenOut(it);
-                    const state = it.date_availed ? 'availed' : out ? 'out' : '';
+                    const state: RowState = it.date_availed ? 'availed' : out ? 'out' : 'stock';
                     return (
                       <tr key={n} className={state}>
                         <td><span className="vm-series">{String(n).padStart(pad, '0')}</span></td>
-                        <td><span className={'vm-status ' + state}>{it.date_availed ? 'Availed' : out ? 'Given out' : 'In stock'}</span></td>
+                        <td><span className={'vm-status ' + state}><StatusIcon state={state} />{state === 'availed' ? 'Availed' : state === 'out' ? 'Given out' : 'In stock'}</span></td>
                         <td><DateField value={it.date_given} onChange={(v) => patch(n, { date_given: v }, true)} /></td>
                         <td><input placeholder="Customer" value={it.customer_name} onChange={(e) => patch(n, { customer_name: e.target.value }, false)} onBlur={() => saveCurrent(n)} /></td>
                         <td><input placeholder="Who redeemed it" value={it.redeemed_by} onChange={(e) => patch(n, { redeemed_by: e.target.value }, false)} onBlur={() => saveCurrent(n)} /></td>
@@ -432,54 +455,71 @@ function TicketIcon({ small }: { small?: boolean }) {
   );
 }
 const stroke = { fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, 'aria-hidden': true };
-const CheckIcon = () => <svg width="18" height="18" viewBox="0 0 24 24" {...stroke}><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>;
-const ArrowIcon = () => <svg width="18" height="18" viewBox="0 0 24 24" {...stroke}><path d="M5 12h14M13 6l6 6-6 6" /></svg>;
-const BoxIcon = () => <svg width="18" height="18" viewBox="0 0 24 24" {...stroke}><path d="M21 8 12 3 3 8v8l9 5 9-5V8Z" /><path d="m3 8 9 5 9-5M12 13v8" /></svg>;
+type RowState = 'stock' | 'out' | 'availed';
+
+// One icon per state, so the status reads without relying on colour alone.
+function StatusIcon({ state, size = 15 }: { state: RowState | ''; size?: number }) {
+  if (state === 'availed') {
+    return <svg width={size} height={size} viewBox="0 0 24 24" {...stroke}><circle cx="12" cy="12" r="9" /><path d="m8 12.5 3 3 5-6" /></svg>;
+  }
+  if (state === 'out') {
+    return <svg width={size} height={size} viewBox="0 0 24 24" {...stroke}><path d="M7 17 17 7M9 7h8v8" /></svg>;
+  }
+  return <svg width={size} height={size} viewBox="0 0 24 24" {...stroke}><path d="M21 8 12 3 3 8v8l9 5 9-5V8Z" /><path d="m3 8 9 5 9-5M12 13v8" /></svg>;
+}
+function SaveIcon({ state }: { state: 'idle' | 'saving' | 'saved' | 'error' }) {
+  if (state === 'saving') return <svg className="spin" width="14" height="14" viewBox="0 0 24 24" {...stroke}><path d="M21 12a9 9 0 1 1-6.2-8.6" /></svg>;
+  if (state === 'error') return <svg width="14" height="14" viewBox="0 0 24 24" {...stroke}><circle cx="12" cy="12" r="9" /><path d="M12 8v5M12 16.5v.01" /></svg>;
+  return <svg width="14" height="14" viewBox="0 0 24 24" {...stroke}><circle cx="12" cy="12" r="9" />{state === 'saved' && <path d="m8 12.5 3 3 5-6" />}</svg>;
+}
+const CheckIcon = ({ size = 18 }: { size?: number }) => <svg width={size} height={size} viewBox="0 0 24 24" {...stroke}><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>;
+const PlusIcon = () => <svg width="15" height="15" viewBox="0 0 24 24" {...stroke}><path d="M12 5v14M5 12h14" /></svg>;
+const ChevronIcon = ({ dir }: { dir: 'left' | 'right' }) => <svg width="16" height="16" viewBox="0 0 24 24" {...stroke}><path d={dir === 'left' ? 'm15 6-6 6 6 6' : 'm9 6 6 6-6 6'} /></svg>;
 const SearchIcon = () => <svg className="vm-search-ico" width="16" height="16" viewBox="0 0 24 24" {...stroke}><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>;
 const DownloadIcon = () => <svg width="15" height="15" viewBox="0 0 24 24" {...stroke}><path d="M12 4v11M7 11l5 5 5-5M5 20h14" /></svg>;
 const TrashIcon = () => <svg width="15" height="15" viewBox="0 0 24 24" {...stroke}><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" /></svg>;
 
 const VM_CSS = `
-.vm { --a:var(--brand-primary,#d9580d); --a-soft:color-mix(in srgb,var(--a) 10%,#fff); --a-line:color-mix(in srgb,var(--a) 28%,#fff);
+.vm { --a:var(--brand-primary,#d9580d); --a-soft:color-mix(in srgb,var(--a) 9%,#fff); --a-line:color-mix(in srgb,var(--a) 30%,#fff);
   --ink:#241c15; --mute:#7a6c5f; --line:#e8e0d5; --bg:#faf7f2; --card:#fff;
-  --green:#2e7d4f; --green-soft:#e7f4ec; --warn:#b7791f; --warn-soft:#fdf3dc; --red:#b42318;
+  --green:#2e7d4f; --green-soft:#e7f4ec; --warn:#a96a0c; --warn-soft:#fcf0d6; --red:#b42318;
   color:var(--ink); max-width:1500px; }
 .vm *, .vm *::before, .vm *::after { box-sizing:border-box; }
 .vm h1, .vm h2, .vm h3 { margin:0; }
+.vm .spin { animation:vmspin .8s linear infinite; }
+@keyframes vmspin { to { transform:rotate(360deg); } }
 
 /* header */
-.vm-head { display:flex; justify-content:space-between; align-items:center; gap:24px; flex-wrap:wrap; margin-bottom:22px; }
+.vm-head { display:flex; justify-content:space-between; align-items:flex-end; gap:20px; flex-wrap:wrap; margin-bottom:20px; }
 .vm-head h1 { font-size:26px; font-weight:750; letter-spacing:-.02em; }
 .vm-head p { margin:4px 0 0; font-size:14px; color:var(--mute); }
-.vm-kpis { display:flex; gap:10px; flex-wrap:wrap; }
-.vm-kpi { display:flex; align-items:center; gap:12px; padding:10px 18px 10px 12px; background:var(--card); border:1px solid var(--line); border-radius:12px; box-shadow:0 1px 2px rgba(36,28,21,.04); }
-.vm-kpi b { display:block; font-size:20px; line-height:1.1; font-weight:750; font-variant-numeric:tabular-nums; }
-.vm-kpi small { font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--mute); }
-.vm-kpi-ico { width:36px; height:36px; border-radius:10px; display:grid; place-items:center; background:var(--a-soft); color:var(--a); }
-.vm-kpi-ico.out { background:var(--warn-soft); color:var(--warn); }
-.vm-kpi-ico.stock { background:var(--a-soft); color:var(--a); }
-.vm-kpi-ico.done { background:var(--green-soft); color:var(--green); }
+.vm-totals { display:flex; margin:0; background:var(--card); border:1px solid var(--line); border-radius:12px; }
+.vm-totals > div { padding:10px 22px; border-left:1px solid var(--line); min-width:104px; }
+.vm-totals > div:first-child { border-left:0; }
+.vm-totals dd { margin:0; font-size:21px; font-weight:750; line-height:1.15; font-variant-numeric:tabular-nums; letter-spacing:-.01em; }
+.vm-totals dt { margin-top:2px; font-size:11px; letter-spacing:.07em; text-transform:uppercase; color:var(--mute); }
+.vm .c-out { color:var(--warn); } .vm .c-done { color:var(--green); }
 
-/* picker */
-.vm-picker { display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:10px; margin-bottom:22px; }
-.vm-card { cursor:pointer; text-align:left; font:inherit; display:flex; flex-direction:column; gap:6px; padding:13px 14px 12px; background:var(--card); border:1px solid var(--line);
-  border-radius:12px; transition:border-color .15s, box-shadow .15s, transform .15s; color:var(--ink); }
-.vm-card:hover { border-color:var(--a-line); box-shadow:0 4px 14px rgba(36,28,21,.07); transform:translateY(-1px); }
-.vm-card.on { border-color:var(--a); box-shadow:0 0 0 3px var(--a-soft); background:linear-gradient(180deg,var(--a-soft),#fff 70%); }
-.vm-card-top { display:flex; justify-content:space-between; align-items:flex-start; gap:6px; }
-.vm-card-name { font-size:12.5px; font-weight:700; letter-spacing:.03em; text-transform:uppercase; line-height:1.3; }
-.vm-card-nums { display:flex; align-items:baseline; gap:5px; }
-.vm-card-nums b { font-size:20px; font-weight:750; font-variant-numeric:tabular-nums; }
-.vm-card-nums small { font-size:12px; color:var(--mute); }
-.vm-card-availed { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--green); font-weight:600; font-variant-numeric:tabular-nums; }
-.vm-card-availed i { width:6px; height:6px; border-radius:50%; background:var(--green); }
-.vm-bar { display:block; height:5px; border-radius:99px; background:#efe8de; overflow:hidden; }
-.vm-bar i { display:block; height:100%; border-radius:99px; background:var(--a); transition:width .3s; }
-.vm-chip { font-size:10px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; padding:2px 7px; border-radius:99px; }
-.vm-chip.warn { background:var(--warn-soft); color:var(--warn); }
-.vm-new { align-items:center; justify-content:center; flex-direction:row; gap:8px; border-style:dashed; border-width:1.5px; color:var(--a); font-weight:650; font-size:13.5px; background:transparent; }
-.vm-new:hover { background:var(--a-soft); }
-.vm-plus { width:24px; height:24px; border-radius:50%; background:var(--a); color:#fff; display:grid; place-items:center; font-size:17px; line-height:1; }
+/* picker: a single row that scrolls sideways */
+.vm-strip-wrap { display:flex; align-items:stretch; gap:8px; margin-bottom:18px; }
+.vm-strip { flex:1; min-width:0; display:flex; gap:8px; overflow-x:auto; scroll-snap-type:x proximity; scrollbar-width:none; padding:2px; }
+.vm-strip::-webkit-scrollbar { display:none; }
+.vm-arrow { flex:none; width:34px; border:1px solid var(--line); border-radius:10px; background:var(--card); color:var(--mute); cursor:pointer; display:grid; place-items:center; }
+.vm-arrow:hover { color:var(--a); border-color:var(--a-line); }
+.vm-tab { flex:none; width:176px; scroll-snap-align:start; cursor:pointer; text-align:left; font:inherit; color:var(--ink); display:flex; flex-direction:column; gap:5px; padding:11px 13px 11px;
+  background:var(--card); border:1px solid var(--line); border-radius:10px; transition:border-color .15s, box-shadow .15s; }
+.vm-tab:hover { border-color:var(--a-line); }
+.vm-tab.on { border-color:var(--a); box-shadow:0 0 0 3px var(--a-soft); }
+.vm-tab-name { display:flex; align-items:center; justify-content:space-between; gap:6px; font-size:12px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.vm-tab-name em { font-style:normal; font-size:9.5px; letter-spacing:.06em; padding:1px 6px; border-radius:99px; background:var(--warn-soft); color:var(--warn); }
+.vm-tab-nums { display:flex; align-items:center; gap:4px; font-size:12px; color:var(--mute); font-variant-numeric:tabular-nums; }
+.vm-tab-nums b { font-size:17px; color:var(--ink); font-weight:750; }
+.vm-tab-av { margin-left:auto; display:inline-flex; align-items:center; gap:2px; color:var(--green); font-weight:650; }
+.vm-bar { position:relative; display:block; height:4px; border-radius:99px; background:#efe8de; overflow:hidden; }
+.vm-bar i { position:absolute; left:0; top:0; bottom:0; border-radius:99px; transition:width .3s; }
+.vm-bar i.pending { background:#e0a540; } .vm-bar i.done { background:var(--green); }
+.vm-add { flex:none; display:inline-flex; align-items:center; gap:7px; padding:0 16px; border:1.5px dashed var(--a-line); border-radius:10px; background:transparent; color:var(--a); font:inherit; font-size:13.5px; font-weight:650; cursor:pointer; white-space:nowrap; }
+.vm-add:hover { background:var(--a-soft); border-color:var(--a); }
 
 /* empty states */
 .vm-empty { text-align:center; padding:30px; color:var(--mute); }
@@ -489,16 +529,14 @@ const VM_CSS = `
 .vm-blank p { margin:0 0 12px; color:var(--mute); font-size:13.5px; }
 
 /* panel */
-.vm-panel { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:20px; box-shadow:0 1px 3px rgba(36,28,21,.04); }
-.vm-panel-head { display:flex; justify-content:space-between; align-items:flex-start; gap:14px; flex-wrap:wrap; margin-bottom:18px; }
-.vm-panel-head h2 { font-size:20px; font-weight:750; letter-spacing:-.01em; text-transform:uppercase; }
+.vm-panel { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:20px; }
+.vm-panel-head { display:flex; justify-content:space-between; align-items:flex-start; gap:14px; flex-wrap:wrap; margin-bottom:16px; }
+.vm-panel-head h2 { font-size:21px; font-weight:780; letter-spacing:-.015em; text-transform:uppercase; }
 .vm-actions { display:flex; gap:8px; flex-wrap:wrap; }
 .vm-save { display:inline-flex; align-items:center; gap:6px; margin-top:5px; font-size:12px; color:var(--mute); }
-.vm-save i { width:7px; height:7px; border-radius:50%; background:#cfc3b5; }
-.vm-save.saving i { background:var(--warn); animation:vmpulse 1s infinite; }
-.vm-save.saved { color:var(--green); } .vm-save.saved i { background:var(--green); }
-.vm-save.error { color:var(--red); font-weight:600; } .vm-save.error i { background:var(--red); }
-@keyframes vmpulse { 50% { opacity:.25; } }
+.vm-save.saving { color:var(--warn); }
+.vm-save.saved { color:var(--green); }
+.vm-save.error { color:var(--red); font-weight:600; }
 
 /* buttons */
 .vm-btn { display:inline-flex; align-items:center; gap:7px; cursor:pointer; padding:8px 14px; border-radius:9px; font:inherit; font-weight:600; font-size:13px; background:var(--card); color:var(--ink); border:1px solid var(--line); transition:all .15s; }
@@ -511,15 +549,23 @@ const VM_CSS = `
 .vm-btn.danger.solid { background:var(--red); border-color:var(--red); color:#fff; }
 .vm-btn.danger.solid:hover { background:var(--red); color:#fff; }
 
-/* stat tiles */
-.vm-stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:12px; margin-bottom:18px; }
-.vm-stat { padding:14px 16px; background:var(--bg); border:1px solid var(--line); border-radius:12px; }
-.vm-stat label { display:block; font-size:11px; font-weight:650; letter-spacing:.07em; text-transform:uppercase; color:var(--mute); }
-.vm-stat b { display:block; font-size:32px; font-weight:780; line-height:1.15; margin:4px 0 2px; font-variant-numeric:tabular-nums; letter-spacing:-.02em; }
-.vm-stat b.c-out { color:var(--warn); } .vm-stat b.c-stock { color:var(--a); } .vm-stat b.c-done { color:var(--green); }
-.vm-stat small { font-size:12px; color:var(--mute); }
+/* summary */
+.vm-summary { margin-bottom:18px; padding:16px 18px 14px; background:var(--bg); border:1px solid var(--line); border-radius:12px; }
+.vm-sum-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); }
+.vm-sum-grid > div { padding:0 18px; border-left:1px solid var(--line); }
+.vm-sum-grid > div:first-child { padding-left:0; border-left:0; }
+.vm-sum-grid label { display:block; font-size:11px; font-weight:650; letter-spacing:.07em; text-transform:uppercase; color:var(--mute); }
+.vm-sum-grid b { display:block; margin:3px 0 1px; font-size:30px; font-weight:780; line-height:1.15; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
+.vm-sum-grid small { font-size:12px; color:var(--mute); }
 .vm-link { background:none; border:0; padding:0; font:inherit; font-size:12.5px; font-weight:600; color:var(--a); cursor:pointer; }
 .vm-link:hover { text-decoration:underline; }
+.vm-stack { display:flex; height:8px; margin-top:16px; border-radius:99px; background:#e9e1d6; overflow:hidden; }
+.vm-stack i { display:block; height:100%; transition:width .3s; }
+.vm-stack i.done { background:var(--green); } .vm-stack i.pending { background:#e0a540; }
+.vm-legend { display:flex; gap:18px; flex-wrap:wrap; margin-top:9px; font-size:12px; color:var(--mute); }
+.vm-legend span { display:inline-flex; align-items:center; gap:6px; }
+.vm-legend i { width:10px; height:10px; border-radius:3px; background:#e9e1d6; }
+.vm-legend i.done { background:var(--green); } .vm-legend i.pending { background:#e0a540; }
 
 /* toolbar */
 .vm-toolbar { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
@@ -529,10 +575,10 @@ const VM_CSS = `
 .vm-clear { position:absolute; right:6px; top:50%; transform:translateY(-50%); width:22px; height:22px; border:0; border-radius:50%; background:#efe8de; color:var(--mute); font-size:10px; cursor:pointer; }
 .vm-search:focus, .vm-table input:focus, .vm-table select:focus { outline:2px solid var(--a); outline-offset:-1px; background:#fff; }
 .vm-seg { display:inline-flex; padding:3px; background:#f1ebe2; border-radius:10px; }
-.vm-seg button { border:0; background:none; font:inherit; font-size:13px; font-weight:600; padding:6px 14px; border-radius:7px; cursor:pointer; color:var(--mute); }
-.vm-seg button em { font-style:normal; font-size:11.5px; margin-left:4px; padding:1px 6px; border-radius:99px; background:rgba(36,28,21,.08); color:var(--mute); font-variant-numeric:tabular-nums; }
-.vm-seg button.on em { background:var(--a-soft); color:var(--a); }
+.vm-seg button { display:inline-flex; align-items:center; gap:6px; border:0; background:none; font:inherit; font-size:13px; font-weight:600; padding:6px 12px; border-radius:7px; cursor:pointer; color:var(--mute); }
+.vm-seg button em { font-style:normal; font-size:11.5px; padding:1px 6px; border-radius:99px; background:rgba(36,28,21,.08); font-variant-numeric:tabular-nums; }
 .vm-seg button.on { background:var(--card); color:var(--ink); box-shadow:0 1px 3px rgba(36,28,21,.12); }
+.vm-seg button.on em { background:var(--a-soft); color:var(--a); }
 .vm-count { margin-left:auto; font-size:12.5px; color:var(--mute); font-variant-numeric:tabular-nums; }
 
 /* table */
@@ -540,10 +586,16 @@ const VM_CSS = `
 .vm-table { width:100%; min-width:1120px; border-collapse:separate; border-spacing:0; font-size:13px; }
 .vm-table thead th { position:sticky; top:0; z-index:2; background:var(--bg); padding:11px 10px; font-size:11px; font-weight:700; letter-spacing:.07em; text-transform:uppercase;
   color:var(--mute); text-align:left; border-bottom:1px solid var(--line); white-space:nowrap; }
-.vm-table td { padding:4px 6px; border-bottom:1px solid #f3ede4; vertical-align:middle; }
+.vm-table td { padding:4px 6px; border-bottom:1px solid #f3ede4; vertical-align:middle; background:var(--card); }
 .vm-table tbody tr:last-child td { border-bottom:0; }
+/* series + status stay put while the rest scrolls sideways */
+.vm-table th:nth-child(1), .vm-table td:nth-child(1) { position:sticky; left:0; z-index:1; width:92px; min-width:92px; }
+.vm-table th:nth-child(2), .vm-table td:nth-child(2) { position:sticky; left:92px; z-index:1; width:132px; min-width:132px; box-shadow:1px 0 0 var(--line); }
+.vm-table thead th:nth-child(1), .vm-table thead th:nth-child(2) { z-index:3; }
 .vm-table tbody tr:hover td { background:#fdfaf6; }
-.vm-table tbody tr.out td:first-child { box-shadow:inset 3px 0 0 var(--warn); }
+.vm-table tbody tr.availed td { background:#f7fbf8; }
+.vm-table tbody tr.availed:hover td { background:#f0f8f3; }
+.vm-table tbody tr.out td:first-child { box-shadow:inset 3px 0 0 #e0a540; }
 .vm-table tbody tr.availed td:first-child { box-shadow:inset 3px 0 0 var(--green); }
 .vm-table input, .vm-table select { width:100%; height:34px; padding:0 9px; border:1px solid transparent; border-radius:7px; background:transparent; font:inherit; font-size:13px; min-width:0; color:var(--ink); }
 .vm-table select { cursor:pointer; min-width:110px; }
@@ -554,9 +606,9 @@ const VM_CSS = `
 .vm-date .cal { color:#b3a595; flex-shrink:0; }
 .vm-date:hover .cal { color:var(--a); }
 .vm-date input { position:absolute; inset:0; width:100%; height:100%; opacity:0; pointer-events:none; }
-.vm-series { display:inline-block; font-family:var(--mono); font-size:12px; font-weight:600; padding:3px 9px; margin-left:4px; border-radius:6px; background:#f1ebe2; color:#5a4d41; }
-.vm-status { display:inline-flex; align-items:center; gap:6px; font-size:11.5px; font-weight:650; padding:3px 10px; border-radius:99px; background:#f1ebe2; color:var(--mute); white-space:nowrap; }
-.vm-status::before { content:''; width:6px; height:6px; border-radius:50%; background:currentColor; opacity:.7; }
+.vm-series { display:inline-block; font-family:var(--mono,ui-monospace,monospace); font-size:12px; font-weight:600; padding:3px 9px; margin-left:4px; border-radius:6px; background:#f1ebe2; color:#5a4d41; }
+.vm-status { display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:650; padding:3px 10px 3px 8px; border-radius:99px; background:#f1ebe2; color:var(--mute); white-space:nowrap; }
+.vm-status svg { flex:none; }
 .vm-status.out { background:var(--warn-soft); color:var(--warn); }
 .vm-status.availed { background:var(--green-soft); color:var(--green); }
 
@@ -565,9 +617,17 @@ const VM_CSS = `
 .vm-pager > div { display:flex; align-items:center; gap:10px; }
 .vm-page { font-variant-numeric:tabular-nums; }
 
+@media (max-width:900px) {
+  .vm-totals { width:100%; }
+  .vm-totals > div { flex:1; padding:10px 14px; min-width:0; }
+  .vm-sum-grid { grid-template-columns:repeat(2,minmax(0,1fr)); row-gap:16px; }
+  .vm-sum-grid > div:nth-child(3) { padding-left:0; border-left:0; }
+}
 @media (max-width:700px) {
   .vm-panel { padding:14px; border-radius:12px; }
   .vm-count { margin-left:0; }
-  .vm-kpi { flex:1 1 40%; }
+  .vm-arrow { display:none; }
+  .vm-add { padding:0 12px; }
+  .vm-totals dd { font-size:18px; }
 }
 `;
