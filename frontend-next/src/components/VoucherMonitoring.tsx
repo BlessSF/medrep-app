@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import Layout from './Layout';
 import { Banner, Modal } from './ui';
+import { BulkFillModal, MAX_BULK, describeSeries, parseSeries, type BulkChanges } from './VoucherBulkFill';
 import { useAuth } from '../context/AuthContext';
 import api, { ApiError } from '../api/client';
 import { exportVouchersWorkbook } from '../lib/exportVouchers';
@@ -50,6 +51,12 @@ export default function VoucherMonitoring() {
   const [modal, setModal] = useState<'new' | 'beginning' | 'remove' | null>(null);
   const [formName, setFormName] = useState('');
   const [formQty, setFormQty] = useState('');
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const lastPicked = useRef<number | null>(null); // anchor for Shift+click
+  const [rangeText, setRangeText] = useState('');
+  const [rangeError, setRangeError] = useState('');
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkSaving, setBulkSaving] = useState(false);
 
   const flash = (text: string, kind: 'success' | 'error' = 'success') => {
     setMsg({ text, kind });
@@ -71,12 +78,18 @@ export default function VoucherMonitoring() {
     setLoading(false);
   }
 
-  async function openVoucher(id: number, refreshList = false) {
-    const r = await api.get(`/vouchers/index.php?id=${id}`);
+  function storeItems(list: Item[]) {
     const map: Record<number, Item> = {};
-    r.items.forEach((i: Item) => { map[i.series_no] = i; });
+    list.forEach((i) => { map[i.series_no] = i; });
     itemsRef.current = map;
     setItems(map);
+  }
+
+  async function openVoucher(id: number, refreshList = false) {
+    const r = await api.get(`/vouchers/index.php?id=${id}`);
+    storeItems(r.items);
+    clearSelection();
+    setRangeText(''); setBulkOpen(false);
     setActiveId(id);
     setBeginning(r.voucher.beginning);
     setPage(0); setQ(''); setFilter('all');
@@ -117,6 +130,70 @@ export default function VoucherMonitoring() {
     if (row) persist(row);
   };
 
+  // ---------- Selecting several series and filling them at once ----------
+  function clearSelection() {
+    setSelected(new Set());
+    setRangeError('');
+    lastPicked.current = null;
+  }
+
+  function toggleRow(n: number, shift: boolean) {
+    const from = lastPicked.current;
+    const next = new Set(selected);
+    const on = !selected.has(n);
+    // Shift+click covers everything between the last click and this one, in the order shown.
+    const a = shift && from !== null ? series.indexOf(from) : -1;
+    const b = series.indexOf(n);
+    const span = a >= 0 && b >= 0 ? series.slice(Math.min(a, b), Math.max(a, b) + 1) : [n];
+    span.forEach((x) => (on ? next.add(x) : next.delete(x)));
+    lastPicked.current = n;
+    setSelected(next);
+  }
+
+  function setMany(list: number[], on: boolean) {
+    const next = new Set(selected);
+    list.forEach((x) => (on ? next.add(x) : next.delete(x)));
+    setSelected(next);
+  }
+
+  function selectRange(e: FormEvent) {
+    e.preventDefault();
+    const result = parseSeries(rangeText, beginning);
+    if ('error' in result) { setRangeError(result.error); return; }
+    setMany(result.list, true);
+    setRangeText(''); setRangeError('');
+  }
+
+  async function applyBulk(changes: BulkChanges, onlyEmpty: boolean) {
+    if (!activeId) return;
+    setBulkSaving(true);
+    setSave('saving');
+    let updated: number;
+    try {
+      const r = await api.post('/vouchers/index.php', {
+        action: 'save_bulk', voucher_id: activeId, series: selectedList, changes, only_empty: onlyEmpty,
+      });
+      updated = r.updated;
+    } catch (e) {
+      setSave('error');
+      setBulkSaving(false);
+      flash(errText(e, 'Could not save those rows.'), 'error');
+      return;
+    }
+    setSave('saved');
+    setBulkSaving(false);
+    setBulkOpen(false);
+    clearSelection();
+    flash(`Updated ${updated.toLocaleString()} ${updated === 1 ? 'row' : 'rows'}.`);
+    try {
+      // Reload the rows but stay on the same page, search and filter.
+      const fresh = await api.get(`/vouchers/index.php?id=${activeId}`);
+      storeItems(fresh.items);
+    } catch (e) {
+      flash(errText(e, 'Saved, but could not refresh the table. Reload the page.'), 'error');
+    }
+  }
+
   // live counts for the open voucher (so tiles update instantly as you type)
   const liveOut = useMemo(() => Object.values(items).filter(isGivenOut).length, [items]);
   const liveAvailed = useMemo(() => Object.values(items).filter((i) => !!i.date_availed).length, [items]);
@@ -147,6 +224,12 @@ export default function VoucherMonitoring() {
   const pages = Math.max(1, Math.ceil(series.length / PAGE_SIZE));
   const safePage = Math.min(page, pages - 1);
   const visible = series.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
+
+  const selectedList = useMemo(() => [...selected].sort((a, b) => a - b), [selected]);
+  const pageSelected = visible.filter((n) => selected.has(n)).length;
+  const allOnPage = visible.length > 0 && pageSelected === visible.length;
+  const isNarrowed = q.trim() !== '' || filter !== 'all';
+  const tooMany = selected.size > MAX_BULK;
 
   async function createVoucher(e: FormEvent) {
     e.preventDefault();
@@ -328,15 +411,49 @@ export default function VoucherMonitoring() {
                 <button className={filter === 'given' ? 'on' : ''} onClick={() => { setFilter('given'); setPage(0); }}><StatusIcon state="out" size={14} />Given out <em>{liveOut}</em></button>
                 <button className={filter === 'availed' ? 'on' : ''} onClick={() => { setFilter('availed'); setPage(0); }}><StatusIcon state="availed" size={14} />Availed <em>{liveAvailed}</em></button>
               </div>
+              <form className="vm-range" onSubmit={selectRange}>
+                <input aria-label="Series numbers to select" placeholder="Select series, e.g. 1-50, 75" value={rangeText}
+                  onChange={(e) => { setRangeText(e.target.value); setRangeError(''); }} />
+                <button type="submit" className="vm-btn" disabled={!rangeText.trim()}>Select</button>
+              </form>
               <span className="vm-count">{series.length.toLocaleString()} {series.length === 1 ? 'row' : 'rows'}</span>
             </div>
+            {rangeError && <p className="vm-range-error" role="alert">{rangeError}</p>}
+
+            {/* ---------- Selection bar ---------- */}
+            {selected.size > 0 ? (
+              <div className="vm-selbar">
+                <div className="vm-selbar-info">
+                  <b>{selected.size.toLocaleString()} selected</b>
+                  <span>{describeSeries(selectedList, pad)}</span>
+                  {tooMany && <span className="vm-selbar-warn">Limit is {MAX_BULK.toLocaleString()} at a time.</span>}
+                </div>
+                <div className="vm-selbar-actions">
+                  {isNarrowed && series.some((n) => !selected.has(n)) && (
+                    <button className="vm-link" onClick={() => setMany(series, true)}>Select all {series.length.toLocaleString()} matching</button>
+                  )}
+                  <button className="vm-btn" onClick={clearSelection}>Clear</button>
+                  <button className="vm-btn solid" disabled={tooMany} onClick={() => setBulkOpen(true)}>Fill selected</button>
+                </div>
+              </div>
+            ) : (
+              <p className="vm-hint">Tip: tick rows to fill many at once. Hold <kbd>Shift</kbd> and click to select everything in between.</p>
+            )}
 
             {/* ---------- Table ---------- */}
             <div className="vm-table-wrap">
               <table className="vm-table">
                 <thead>
                   <tr>
-                    <th>Series</th><th>Status</th><th>Date given</th><th>Customer name</th>
+                    <th>
+                      <span className="vm-pick">
+                        <input type="checkbox" className="vm-check" aria-label="Select all rows on this page"
+                          checked={allOnPage} disabled={visible.length === 0}
+                          ref={(el) => { if (el) el.indeterminate = pageSelected > 0 && !allOnPage; }}
+                          onChange={() => setMany(visible, !allOnPage)} />
+                        Series
+                      </span>
+                    </th><th>Status</th><th>Date given</th><th>Customer name</th>
                     <th>Redeemed by</th><th>Payment</th><th>Remarks</th>
                     <th>Date availed</th><th>Note (c/o Acctng)</th>
                   </tr>
@@ -350,8 +467,15 @@ export default function VoucherMonitoring() {
                     const out = isGivenOut(it);
                     const state: RowState = it.date_availed ? 'availed' : out ? 'out' : 'stock';
                     return (
-                      <tr key={n} className={state}>
-                        <td><span className="vm-series">{String(n).padStart(pad, '0')}</span></td>
+                      <tr key={n} className={state + (selected.has(n) ? ' picked' : '')}>
+                        <td>
+                          <span className="vm-pick">
+                            <input type="checkbox" className="vm-check" aria-label={'Select series ' + String(n).padStart(pad, '0')}
+                              checked={selected.has(n)}
+                              onChange={(e) => toggleRow(n, (e.nativeEvent as MouseEvent).shiftKey === true)} />
+                            <span className="vm-series">{String(n).padStart(pad, '0')}</span>
+                          </span>
+                        </td>
                         <td><span className={'vm-status ' + state}><StatusIcon state={state} />{state === 'availed' ? 'Availed' : state === 'out' ? 'Given out' : 'In stock'}</span></td>
                         <td><DateField value={it.date_given} onChange={(v) => patch(n, { date_given: v }, true)} /></td>
                         <td><input placeholder="Customer" value={it.customer_name} onChange={(e) => patch(n, { customer_name: e.target.value }, false)} onBlur={() => saveCurrent(n)} /></td>
@@ -381,6 +505,20 @@ export default function VoucherMonitoring() {
           </section>
         )}
       </div>
+
+      {/* Popups sit in their own .vm wrapper so buttons get the voucher theme colours. */}
+      <div className="vm">
+      {bulkOpen && selected.size > 0 && (
+        <BulkFillModal
+          rows={selectedList.map((n) => items[n] || blank(n))}
+          label={describeSeries(selectedList, pad)}
+          paymentModes={PAYMENT_MODES}
+          remarks={REMARKS}
+          saving={bulkSaving}
+          onApply={applyBulk}
+          onClose={() => setBulkOpen(false)}
+        />
+      )}
 
       {modal === 'new' && (
         <Modal title="New voucher" onClose={() => setModal(null)}>
@@ -413,6 +551,7 @@ export default function VoucherMonitoring() {
           </div>
         </Modal>
       )}
+      </div>
     </Layout>
   );
 }
